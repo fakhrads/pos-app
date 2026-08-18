@@ -1,0 +1,29 @@
+{
+  "name": "@fakhripos/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "FakhriPOS Backend API — Bun + Elysia + Drizzle ORM (PostgreSQL db_pos)",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:push": "drizzle-kit push",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.44.2",
+    "elysia": "^1.2.25",
+    "jose": "^6.0.10",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@elysiajs/swagger": "^1.2.2",
+    "@types/bun": "^1.2.2",
+    "drizzle-kit": "^0.31.2",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}

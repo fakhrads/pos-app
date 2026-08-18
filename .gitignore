@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+.next/
+out/
+dist/
+build/
+
+# env — jangan pernah commit secret
+.env
+.env.*
+!.env.example
+
+# logs & artifacts
+*.log
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
