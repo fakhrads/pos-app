@@ -1,66 +1,68 @@
 /**
- * FakhriPOS Design Tokens
+ * FakhriPOS Design Tokens v2
  * 
- * Modern flat design — referensi: Linear, Vercel Dashboard, Notion
- * 
- * Struktur:
- * - Colors: 1 accent + neutral 50-950 + semantic (success/warning/danger/info)
- * - Spacing: 4px grid
- * - Radius: 3 levels (sm/md/lg)
- * - Shadow: 3 levels
- * - Typography: 4 sizes + 2 weights
+ * Modern flat design — referensi: Linear, Vercel Dashboard, Tokopedia
+ * Accent: Blue (#0066FF) — netral, profesional
  */
 
 // ============================================================
 // COLORS — Light Mode
 // ============================================================
 export const lightColors = {
-  // Brand accent (cyan)
-  accent: {
-    50: "oklch(0.97 0.02 192)",
-    100: "oklch(0.93 0.04 192)",
-    200: "oklch(0.87 0.08 192)",
-    300: "oklch(0.78 0.12 192)",
-    400: "oklch(0.68 0.16 192)",
-    500: "oklch(0.55 0.15 192)", // Primary accent
-    600: "oklch(0.48 0.14 192)",
-    700: "oklch(0.42 0.12 192)",
-    800: "oklch(0.35 0.10 192)",
-    900: "oklch(0.28 0.08 192)",
-    950: "oklch(0.20 0.06 192)",
+  // Surface scale
+  surface: {
+    DEFAULT: "#FAFBFC",
+    raised: "#FFFFFF",
+    sunken: "#F1F3F5",
   },
 
-  // Neutral scale (zinc-like)
-  neutral: {
-    50: "oklch(0.985 0 0)",
-    100: "oklch(0.967 0 0)",
-    200: "oklch(0.922 0 0)",
-    300: "oklch(0.872 0 0)",
-    400: "oklch(0.708 0 0)",
-    500: "oklch(0.556 0 0)",
-    600: "oklch(0.439 0 0)",
-    700: "oklch(0.355 0 0)",
-    800: "oklch(0.269 0 0)",
-    900: "oklch(0.205 0 0)",
-    950: "oklch(0.145 0 0)",
+  // Border scale
+  border: {
+    DEFAULT: "#E2E5E9",
+    strong: "#CDD1D6",
+  },
+
+  // Text scale
+  text: {
+    primary: "#1A1D21",
+    secondary: "#5F6B7A",
+    muted: "#8C95A0",
+  },
+
+  // Brand accent — Blue
+  accent: {
+    DEFAULT: "#0066FF",
+    hover: "#0052CC",
+    subtle: "#EBF2FF",
+    fg: "#FFFFFF",
   },
 
   // Semantic colors
   success: {
-    DEFAULT: "oklch(0.55 0.18 162)",
-    muted: "oklch(0.55 0.18 162 / 0.1)",
+    DEFAULT: "#16A34A",
+    subtle: "#DCFCE7",
+    fg: "#FFFFFF",
   },
   warning: {
-    DEFAULT: "oklch(0.75 0.18 85)",
-    muted: "oklch(0.75 0.18 85 / 0.1)",
+    DEFAULT: "#D97706",
+    subtle: "#FEF3C7",
+    fg: "#FFFFFF",
   },
   danger: {
-    DEFAULT: "oklch(0.58 0.24 27)",
-    muted: "oklch(0.58 0.24 27 / 0.1)",
+    DEFAULT: "#DC2626",
+    subtle: "#FEE2E2",
+    fg: "#FFFFFF",
   },
   info: {
-    DEFAULT: "oklch(0.55 0.17 280)",
-    muted: "oklch(0.55 0.17 280 / 0.1)",
+    DEFAULT: "#2563EB",
+    subtle: "#DBEAFE",
+    fg: "#FFFFFF",
+  },
+
+  // Skeleton
+  skeleton: {
+    base: "#E8EBED",
+    shine: "#F4F5F7",
   },
 } as const;
 
@@ -68,52 +70,60 @@ export const lightColors = {
 // COLORS — Dark Mode
 // ============================================================
 export const darkColors = {
-  // Brand accent (same hue, brighter for dark bg)
+  // Surface scale — blue-tinted dark
+  surface: {
+    DEFAULT: "#0F1218",
+    raised: "#1A1F2B",
+    sunken: "#0A0D12",
+  },
+
+  // Border scale
+  border: {
+    DEFAULT: "#2A3040",
+    strong: "#3D4556",
+  },
+
+  // Text scale — not pure white
+  text: {
+    primary: "#EBEDF0",
+    secondary: "#8B95A5",
+    muted: "#5C6678",
+  },
+
+  // Brand accent — brighter for dark bg
   accent: {
-    50: "oklch(0.20 0.06 192)",
-    100: "oklch(0.25 0.08 192)",
-    200: "oklch(0.30 0.10 192)",
-    300: "oklch(0.38 0.12 192)",
-    400: "oklch(0.48 0.14 192)",
-    500: "oklch(0.58 0.16 192)", // Primary accent
-    600: "oklch(0.68 0.16 192)",
-    700: "oklch(0.78 0.14 192)",
-    800: "oklch(0.87 0.12 192)",
-    900: "oklch(0.93 0.08 192)",
-    950: "oklch(0.97 0.04 192)",
+    DEFAULT: "#4D94FF",
+    hover: "#3D80E6",
+    subtle: "#1A2744",
+    fg: "#FFFFFF",
   },
 
-  // Neutral scale (inverted for dark)
-  neutral: {
-    50: "oklch(0.145 0 0)",
-    100: "oklch(0.18 0 0)",
-    200: "oklch(0.22 0 0)",
-    300: "oklch(0.28 0 0)",
-    400: "oklch(0.35 0 0)",
-    500: "oklch(0.45 0 0)",
-    600: "oklch(0.55 0 0)",
-    700: "oklch(0.65 0 0)",
-    800: "oklch(0.80 0 0)",
-    900: "oklch(0.90 0 0)",
-    950: "oklch(0.985 0 0)",
-  },
-
-  // Semantic colors (brighter for dark bg)
+  // Semantic colors — brighter for dark bg
   success: {
-    DEFAULT: "oklch(0.65 0.18 162)",
-    muted: "oklch(0.65 0.18 162 / 0.15)",
+    DEFAULT: "#34D399",
+    subtle: "#0D3326",
+    fg: "#FFFFFF",
   },
   warning: {
-    DEFAULT: "oklch(0.80 0.18 85)",
-    muted: "oklch(0.80 0.18 85 / 0.15)",
+    DEFAULT: "#FBBF24",
+    subtle: "#3D2E0A",
+    fg: "#000000",
   },
   danger: {
-    DEFAULT: "oklch(0.65 0.22 27)",
-    muted: "oklch(0.65 0.22 27 / 0.15)",
+    DEFAULT: "#F87171",
+    subtle: "#3D1212",
+    fg: "#FFFFFF",
   },
   info: {
-    DEFAULT: "oklch(0.65 0.17 280)",
-    muted: "oklch(0.65 0.17 280 / 0.15)",
+    DEFAULT: "#60A5FA",
+    subtle: "#0F1D3D",
+    fg: "#FFFFFF",
+  },
+
+  // Skeleton — lighter than surface in dark mode
+  skeleton: {
+    base: "#1E2430",
+    shine: "#283040",
   },
 } as const;
 
@@ -121,6 +131,7 @@ export const darkColors = {
 // SPACING — 4px grid
 // ============================================================
 export const spacing = {
+  px: "1px",
   0: "0",
   0.5: "2px",
   1: "4px",
@@ -144,75 +155,77 @@ export const spacing = {
 } as const;
 
 // ============================================================
-// RADIUS — 3 levels
+// RADIUS — 3 levels per spec
 // ============================================================
 export const radius = {
-  sm: "6px",
-  md: "10px",
-  lg: "14px",
+  none: "0",
+  sm: "8px",   // badge, input, tombol kecil
+  md: "12px",  // card, dropdown
+  lg: "16px",  // sheet, modal, dialog
   full: "9999px",
 } as const;
 
 // ============================================================
 // SHADOW — 3 levels
-// Light: subtle elevation
-// Dark: stronger borders instead
 // ============================================================
 export const shadows = {
-  // Level 1: Subtle (cards at rest)
-  sm: "0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06)",
-  // Level 2: Medium (dropdowns, popovers)
-  md: "0 2px 4px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.08)",
-  // Level 3: High (modals, dialogs)
-  lg: "0 4px 8px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.12)",
+  sm: "0 1px 2px rgba(0,0,0,.06)",
+  md: "0 4px 12px rgba(0,0,0,.08)",
+  lg: "0 12px 32px rgba(0,0,0,.12)",
 } as const;
 
+// Dark mode: borders replace shadows
 export const darkShadows = {
-  sm: "0 0 0 1px rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.3)",
-  md: "0 0 0 1px rgba(255,255,255,.08), 0 4px 12px rgba(0,0,0,.4)",
-  lg: "0 0 0 1px rgba(255,255,255,.10), 0 8px 24px rgba(0,0,0,.5)",
+  sm: "none",
+  md: "none",
+  lg: "none",
 } as const;
 
 // ============================================================
-// TYPOGRAPHY — 4 sizes + 2 weights
+// TYPOGRAPHY
 // ============================================================
 export const typography = {
   fontSize: {
-    xs: "0.75rem",    // 12px — captions, labels
-    sm: "0.875rem",   // 14px — body small, table cells
-    base: "1rem",     // 16px — body
-    lg: "1.125rem",   // 18px — headings
+    xs: "0.75rem",    // 12px — caption, badge
+    sm: "0.875rem",   // 14px — body kecil, helper
+    base: "1rem",     // 16px — body utama
+    lg: "1.125rem",   // 18px — heading
+    xl: "1.25rem",    // 20px — nominal angka
+    "2xl": "1.5rem",  // 24px — sub-judul
+    "3xl": "1.75rem", // 28px — total bayar kasir
   },
   fontWeight: {
     normal: "400",
     medium: "500",
     semibold: "600",
+    bold: "700",
   },
   lineHeight: {
     tight: "1.25",
     normal: "1.5",
     relaxed: "1.625",
   },
-  letterSpacing: {
-    tight: "-0.01em",
-    normal: "0",
-  },
 } as const;
 
 // ============================================================
-// DENSITY
+// DENSITY — touch targets & row heights
 // ============================================================
 export const density = {
-  // Table row height
-  tableRow: "44px",
-  // Input height
-  inputSm: "32px",
-  inputMd: "36px",
-  inputLg: "40px",
-  // Button height
-  btnSm: "32px",
-  btnMd: "36px",
-  btnLg: "40px",
+  // Minimum touch target
+  touchMin: "48px",
+  // Table rows
+  tableRow: "48px",
+  tableRowCompact: "40px",
+  // Inputs
+  inputSm: "36px",
+  inputMd: "40px",
+  inputLg: "48px",
+  // Buttons
+  btnSm: "36px",
+  btnMd: "40px",
+  btnLg: "48px",
+  // Bottom nav height
+  bottomNav: "64px",
 } as const;
 
 // ============================================================
@@ -223,3 +236,39 @@ export const transitions = {
   normal: "200ms cubic-bezier(0.4, 0, 0.2, 1)",
   slow: "300ms cubic-bezier(0.4, 0, 0.2, 1)",
 } as const;
+
+// ============================================================
+// TERM MAPPING — Bahasa manusia
+// ============================================================
+export const termMapping: Record<string, string> = {
+  // Developer → User
+  "SKU": "Kode Barang",
+  "COGS": "Modal Barang",
+  "HPP": "Modal Barang",
+  "Stock Adjustment": "Koreksi Stok",
+  "Reconciliation": "Cocokkan Uang Kas",
+  "Void Transaction": "Batalkan Transaksi",
+  "Gross Margin": "Untung Kotor",
+  "Outstanding AR": "Piutang Belum Dibayar",
+  "Cost Price": "Harga Modal",
+  "Selling Price": "Harga Jual",
+  "Stock On Hand": "Stok Tersedia",
+  "Min Stock": "Stok Minimum",
+  "Is Active": "Aktif",
+  "Is Taxable": "Kena Pajak",
+  "Payment Method": "Cara Bayar",
+  "Payment Status": "Status Bayar",
+  "Transaction Status": "Status Transaksi",
+  "Discount Type": "Jenis Diskon",
+  "Discount Scope": "Cakupan Diskon",
+  "Refund Method": "Cara Refund",
+  "Return Status": "Status Retur",
+  "Point Movement": "Pergerakan Poin",
+  "Movement Type": "Jenis Pergerakan",
+  "Audit Log": "Riwayat Aktivitas",
+  "Created At": "Dibuat",
+  "Updated At": "Diubah",
+  "Deleted At": "Dihapus",
+  "User Role": "Peran Pengguna",
+  "Membership Tier": "Level Member",
+};
