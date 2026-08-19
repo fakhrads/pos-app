@@ -2,18 +2,27 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Save } from "lucide-react";
+import { FlaskConical, Loader2, RotateCcw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/page-header";
 import { AdminOnly } from "@/components/role-guard";
 import { api, ApiError } from "@/lib/api";
 import { useSettings } from "@/hooks/use-settings";
 import type { SettingsResponse } from "@/lib/types";
+import {
+  getPracticeMode,
+  setPracticeMode,
+  resetOnboarding,
+  localStorageRemainingBytes,
+  getPracticeTransactions,
+  clearPracticeTransactions,
+} from "@/lib/phase6-storage";
 
 interface TaxRate {
   id: string;
@@ -46,6 +55,16 @@ export default function SettingsPage() {
 
   const [saving, setSaving] = useState(false);
   const [savingTax, setSavingTax] = useState(false);
+
+  // Phase 6 — Mode Latihan + Reset Onboarding
+  const [practice, setPractice] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [practiceTxCount, setPracticeTxCount] = useState(0);
+
+  useEffect(() => {
+    setPractice(getPracticeMode());
+    setPracticeTxCount(getPracticeTransactions().length);
+  }, []);
 
   useEffect(() => {
     if (settings) {
@@ -131,6 +150,30 @@ export default function SettingsPage() {
     } finally {
       setSavingTax(false);
     }
+  }
+
+  function handleTogglePractice(active: boolean) {
+    const ok = setPracticeMode(active);
+    if (!ok) {
+      toast.error("Mode Latihan tidak bisa diaktifkan karena penyimpanan penuh.");
+      return;
+    }
+    setPractice(active);
+    if (!active) {
+      // Nonaktif → data latihan dihapus dari localStorage
+      clearPracticeTransactions();
+      setPracticeTxCount(0);
+      toast.info("Data latihan telah dihapus dari penyimpanan lokal.");
+    }
+    toast.success(active ? "Mode Latihan aktif" : "Mode Latihan nonaktif");
+  }
+
+  function handleResetOnboarding() {
+    resetOnboarding();
+    setResetOpen(false);
+    toast.success("Pengaturan ini disetel ulang ke default. Onboarding akan tampil lagi saat Anda masuk berikutnya.", {
+      duration: 5000,
+    });
   }
 
   return (
@@ -249,6 +292,78 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Phase 6 — Mode Latihan & Reset Onboarding */}
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        {/* Mode Latihan */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <FlaskConical className="size-4 text-warning" /> Mode Latihan
+            </CardTitle>
+            <CardDescription>
+              Latih kasir baru tanpa mengotori data asli. Transaksi hanya disimpan di perangkat ini.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Aktifkan Mode Latihan</p>
+                <p className="text-xs text-muted-foreground">
+                  {practice
+                    ? "Semua transaksi masuk penyimpanan lokal (tidak ke server)."
+                    : "Transaksi dicatat ke database asli."}
+                </p>
+              </div>
+              <Switch
+                checked={practice}
+                onCheckedChange={handleTogglePractice}
+                aria-label="Aktifkan Mode Latihan"
+              />
+            </div>
+            {practice && (
+              <div className="rounded-lg border border-warning/30 bg-warning-subtle/40 px-3 py-2 text-xs text-warning">
+                ⚠️ Banner oranye "Mode Latihan" muncul di atas layar. Data latihan (
+                {practiceTxCount} transaksi) dihapus saat mode dimatikan.
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Sisa penyimpanan: ~{Math.round(localStorageRemainingBytes() / 1024)} KB
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Reset Onboarding */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <RotateCcw className="size-4 text-accent" /> Pengenalan Awal
+            </CardTitle>
+            <CardDescription>
+              Wizard 6 langkah sudah selesai. Reset kalau ingin mengubah profil usaha & menampilkan wizard lagi.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11"
+              onClick={() => setResetOpen(true)}
+            >
+              <RotateCcw className="mr-1 size-3.5" /> Reset Onboarding
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <ConfirmDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title="Reset pengaturan onboarding?"
+        description="Semua pengaturan akan di-reset ke default. Profil usaha (nama, jenis, outlet, dll.) akan dihapus dan wizard tampil lagi saat Anda masuk berikutnya. Lanjutkan?"
+        confirmText="Ya, Reset"
+        onConfirm={handleResetOnboarding}
+      />
     </AdminOnly>
   );
 }

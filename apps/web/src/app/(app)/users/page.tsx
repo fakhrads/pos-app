@@ -111,7 +111,16 @@ export default function UsersPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <EmptyState title="Belum ada pengguna" />
+          <EmptyState
+            icon={<UserPlus className="size-7" />}
+            title="Belum ada pengguna"
+            description="Tambahkan kasir atau manajer untuk mengelola akses aplikasi."
+            action={
+              <Button size="sm" onClick={() => { setEditing(null); setFormOpen(true); }}>
+                <UserPlus className="size-4" /> Tambah Pengguna
+              </Button>
+            }
+          />
         ) : (
           <Table>
             <TableHeader>

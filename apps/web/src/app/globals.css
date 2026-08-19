@@ -35,6 +35,7 @@
   --success-subtle: #DCFCE7;
   --warning: #D97706;
   --warning-subtle: #FEF3C7;
+  --warning-fg: #FFFFFF;
   --danger: #DC2626;
   --danger-subtle: #FEE2E2;
   --info: #2563EB;
@@ -102,6 +103,7 @@
   --success-subtle: #0D3326;
   --warning: #FBBF24;
   --warning-subtle: #3D2E0A;
+  --warning-fg: #1F1300;
   --danger: #F87171;
   --danger-subtle: #3D1212;
   --info: #60A5FA;
@@ -168,6 +170,7 @@
   --color-success-subtle: var(--success-subtle);
   --color-warning: var(--warning);
   --color-warning-subtle: var(--warning-subtle);
+  --color-warning-fg: var(--warning-fg);
   --color-danger: var(--danger);
   --color-danger-subtle: var(--danger-subtle);
   --color-info: var(--info);

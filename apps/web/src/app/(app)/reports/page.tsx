@@ -16,6 +16,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { api, ApiError } from "@/lib/api";
 import { formatIDR, formatNumber, lastNDaysWIB, todayWIB } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -61,6 +65,12 @@ export default function ReportsPage() {
       <PageHeader
         title="Laporan"
         description="Pantau penjualan, laba, kondisi stok, dan arus kas. Semua laporan bisa diexport Excel/PDF/CSV."
+        actions={
+          <>
+            <ModuleHelpButton moduleId="reports" />
+            <ModuleIntroBadge moduleId="reports" />
+          </>
+        }
       />
       <Tabs defaultValue={initialTab}>
         <TabsList className="flex-wrap">

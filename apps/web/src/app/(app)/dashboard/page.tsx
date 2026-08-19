@@ -20,6 +20,10 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ManagerOnly } from "@/components/role-guard";
 import { LowStockWidget } from "@/components/dashboard/low-stock-widget";
+import {
+  ModuleIntroBadge,
+  ModuleHelpButton,
+} from "@/components/onboarding/module-intro";
 import { api } from "@/lib/api";
 import {
   formatDateTime,
@@ -54,9 +58,13 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Ringkasan performa toko hari ini."
         actions={
-          <Button asChild>
-            <Link href="/pos">Buka Kasir</Link>
-          </Button>
+          <>
+            <ModuleHelpButton moduleId="dashboard" />
+            <ModuleIntroBadge moduleId="dashboard" />
+            <Button asChild>
+              <Link href="/pos">Buka Kasir</Link>
+            </Button>
+          </>
         }
       />
 
@@ -132,7 +140,16 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 {data.salesLast7Days.length === 0 ? (
-                  <EmptyState title="Belum ada penjualan" />
+                  <EmptyState
+                    icon={<TrendingUp className="size-8" />}
+                    title="Belum ada penjualan 7 hari terakhir"
+                    description="Mulai jualan dari layar Kasir, lalu grafik penjualan akan muncul di sini."
+                    action={
+                      <Button asChild size="sm">
+                        <Link href="/pos">Buka Kasir</Link>
+                      </Button>
+                    }
+                  />
                 ) : (
                   <BarChart data={data.salesLast7Days} />
                 )}
@@ -145,7 +162,16 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {Object.keys(data.paymentMethodsToday).length === 0 && (
-                  <p className="text-xs text-muted-foreground">Belum ada pembayaran hari ini.</p>
+                  <EmptyState
+                    icon={<Banknote className="size-7" />}
+                    title="Belum ada transaksi tunai hari ini"
+                    description="Cara pembayaran yang dipakai pelanggan akan muncul di sini."
+                    action={
+                      <Button asChild size="sm" variant="outline">
+                        <Link href="/pos">Buka Kasir</Link>
+                      </Button>
+                    }
+                  />
                 )}
                 {Object.entries(data.paymentMethodsToday).map(([method, amount]) => (
                   <div key={method} className="flex items-center justify-between text-sm">
@@ -177,7 +203,16 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-1 pt-4">
                 {data.recentTransactions.length === 0 && (
-                  <EmptyState title="Belum ada transaksi hari ini" />
+                  <EmptyState
+                    icon={<Receipt className="size-7" />}
+                    title="Belum ada transaksi hari ini"
+                    description="Transaksi yang dicatat dari Kasir akan muncul di sini."
+                    action={
+                      <Button asChild size="sm" variant="outline">
+                        <Link href="/pos">Buka Kasir</Link>
+                      </Button>
+                    }
+                  />
                 )}
                 {data.recentTransactions.map((tx) => (
                   <Link
@@ -214,7 +249,16 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-1 pt-4">
                 {data.topProductsToday.length === 0 && (
-                  <EmptyState title="Belum ada produk terjual" />
+                  <EmptyState
+                    icon={<ShoppingBag className="size-7" />}
+                    title="Belum ada produk terjual"
+                    description="Produk terlaris hari ini akan muncul setelah ada penjualan."
+                    action={
+                      <Button asChild size="sm" variant="outline">
+                        <Link href="/pos">Buka Kasir</Link>
+                      </Button>
+                    }
+                  />
                 )}
                 {data.topProductsToday.map((p, i) => (
                   <div

@@ -1,7 +1,7 @@
 /**
  * Glosarium — Kamus Istilah untuk UMKM
  * 
- * Minimal 30 istilah, tiap entri:
+ * Minimal 50 istilah, tiap entri:
  * - term: istilah teknis
  * - plain: istilah sehari-hari
  * - definition: penjelasan singkat
@@ -288,6 +288,204 @@ export const glossary: GlossaryEntry[] = [
     plain: "Riwayat Aktivitas",
     definition: "Catatan siapa yang mengubah apa dan kapan. Untuk keamanan dan jejak.",
     example: "Budi mengubah harga Indomie dari Rp 2.800 ke Rp 3.000",
+    relatedModule: "Sistem",
+  },
+
+  // ===== KASIR (lanjutan) =====
+  {
+    id: "g035",
+    term: "Hold Order",
+    plain: "Tahan Pesanan",
+    definition: "Menyimpan sementara keranjang yang belum dibayar, untuk dilanjutkan nanti.",
+    example: "Pelanggan minta tahan dulu 3 item, baru bayar 10 menit kemudian",
+    relatedModule: "Kasir",
+  },
+  {
+    id: "g036",
+    term: "Idempotency Key",
+    plain: "Kunci Anti Ganda",
+    definition: "Tanda unik pada transaksi supaya kalau tombol ditekan dua kali, tidak tercatat dua kali.",
+    example: "Transaksi #047 hanya dibuat sekali walau tombol ditekan 2x",
+    relatedModule: "Kasir",
+  },
+  {
+    id: "g037",
+    term: "Cashback",
+    plain: "Uang Kembali Lebih",
+    definition: "Bonus uang kembali sebagian dari total belanja, biasanya dari promo.",
+    example: "Beli Rp 100.000 dapat cashback Rp 5.000",
+    relatedModule: "Kasir",
+  },
+  {
+    id: "g038",
+    term: "Receipt",
+    plain: "Struk",
+    definition: "Bukti transaksi yang dicetak atau dikirim, berisi daftar barang dan total bayar.",
+    example: "Struk 58mm berisi 3 item, total Rp 34.000",
+    relatedModule: "Kasir",
+  },
+
+  // ===== PRODUK (lanjutan) =====
+  {
+    id: "g006",
+    term: "Selling Price",
+    plain: "Harga Jual",
+    definition: "Harga yang kamu jual ke pelanggan. Beda dari harga modal (HPP).",
+    example: "Indomie jual Rp 3.000, modal Rp 2.500",
+    relatedModule: "Produk",
+  },
+  {
+    id: "g007",
+    term: "Cost Price",
+    plain: "Harga Modal",
+    definition: "Harga beli dari supplier untuk satu barang. Basis hitung untung.",
+    example: "Modal per pcs Rp 2.500, stok 120 pcs = Rp 300.000",
+    relatedModule: "Produk",
+  },
+  {
+    id: "g008",
+    term: "Is Taxable",
+    plain: "Kena Pajak",
+    definition: "Tanda bahwa barang dikenai PPN. Diaktifkan untuk barang/jasa kena pajak.",
+    example: "Produk non-pokok kena PPN 11%, beras tidak",
+    relatedModule: "Produk",
+  },
+  {
+    id: "g009",
+    term: "Active Product",
+    plain: "Produk Aktif",
+    definition: "Barang yang tampil dan bisa dijual. Produk nonaktif disembunyikan.",
+    example: "Indomie aktif, Air Galon nonaktif sementara",
+    relatedModule: "Produk",
+  },
+
+  // ===== STOK (lanjutan) =====
+  {
+    id: "g016",
+    term: "Low Stock",
+    plain: "Stok Menipis",
+    definition: "Stok yang sudah di bawah atau sama dengan ambang batas minimum.",
+    example: "Min 30, stok 24 → ditandai stok menipis",
+    relatedModule: "Stok",
+  },
+  {
+    id: "g017",
+    term: "Dead Stock",
+    plain: "Stok Mati",
+    definition: "Barang yang lama tidak terjual, mengikat modal yang seharusnya bisa dipakai.",
+    example: "Produk tidak laku 90 hari → dead stock Rp 2.000.000",
+    relatedModule: "Stok",
+  },
+  {
+    id: "g018",
+    term: "Inventory Value",
+    plain: "Nilai Persediaan",
+    definition: "Total nilai rupiah semua barang di gudang (stok × harga modal).",
+    example: "120 Indomie × Rp 2.500 + 50 Aqua × Rp 4.000 = Rp 500.000",
+    relatedModule: "Stok",
+  },
+  {
+    id: "g019",
+    term: "Capacity Utilization",
+    plain: "Pemanfaatan Kapasitas",
+    definition: "Seberapa penuh gudang terisi dibanding kapasitas maksimal.",
+    example: "Kapasitas 1.000, terisi 800 → 80%",
+    relatedModule: "Stok",
+  },
+
+  // ===== KEUANGAN (lanjutan) =====
+  {
+    id: "g026",
+    term: "Net Profit",
+    plain: "Laba Bersih",
+    definition: "Untung yang tersisa setelah semua biaya dikurangi dari pendapatan.",
+    example: "Pendapatan Rp 2.450k - HPP Rp 1.200k - Biaya Rp 360k = Rp 890k",
+    relatedModule: "Laporan",
+  },
+  {
+    id: "g027",
+    term: "Operating Expense",
+    plain: "Biaya Operasional",
+    definition: "Pengeluaran rutin untuk menjalankan usaha: sewa, listrik, gaji.",
+    example: "Listrik Rp 350.000 + Sewa Rp 1.000.000 per bulan",
+    relatedModule: "Laporan",
+  },
+  {
+    id: "g028",
+    term: "Point Value",
+    plain: "Nilai Poin",
+    definition: "Berapa rupiah setara satu poin saat ditukar / diredeem.",
+    example: "1 poin = Rp 10, 250 poin = Rp 2.500",
+    relatedModule: "Pelanggan",
+  },
+  {
+    id: "g029",
+    term: "Tax Rate",
+    plain: "Tarif Pajak",
+    definition: "Persentase pajak yang dikenakan (PPN). Saat ini umumnya 11%.",
+    example: "Total Rp 100.000 + PPN 11% = Rp 111.000",
+    relatedModule: "Laporan",
+  },
+
+  // ===== DISKON (lanjutan) =====
+  {
+    id: "g062",
+    term: "Discount Type",
+    plain: "Jenis Diskon",
+    definition: "Bentuk potongan harga: persentase atau nominal tetap.",
+    example: "Diskon 10% atau potongan Rp 5.000",
+    relatedModule: "Produk",
+  },
+
+  // ===== PELANGGAN (lanjutan) =====
+  {
+    id: "g052",
+    term: "Member Tier",
+    plain: "Level Member",
+    definition: "Tingkatan member berdasarkan total belanja, makin tinggi makin banyak untung.",
+    example: "Silver → Gold → Platinum, poin beda per level",
+    relatedModule: "Pelanggan",
+  },
+  {
+    id: "g053",
+    term: "Outstanding Balance",
+    plain: "Sisa Hutang",
+    definition: "Jumlah uang yang masih harus dibayar pelanggan dari kasbon.",
+    example: "Kasbon Rp 150.000, sudah bayar Rp 50.000 → sisa Rp 100.000",
+    relatedModule: "Pelanggan",
+  },
+
+  // ===== SISTEM / LAIN-LAIN (lanjutan) =====
+  {
+    id: "g074",
+    term: "Shift Open",
+    plain: "Buka Shift",
+    definition: "Mulai periode kerja kasir, biasanya diisi modal awal laci kas.",
+    example: "Buka shift 08:00, modal awal Rp 500.000",
+    relatedModule: "Kasir",
+  },
+  {
+    id: "g075",
+    term: "Shift Close",
+    plain: "Tutup Shift",
+    definition: "Mengakhiri periode kerja dan menghitung hasil penjualan satu shift.",
+    example: "Tutup shift 20:00, total penjualan shift Rp 2.450.000",
+    relatedModule: "Kasir",
+  },
+  {
+    id: "g076",
+    term: "Practice Mode",
+    plain: "Mode Latihan",
+    definition: "Mode khusus untuk melatih kasir; transaksi tidak masuk data asli.",
+    example: "Kasir baru latihan 5 transaksi tanpa mengotori laporan",
+    relatedModule: "Sistem",
+  },
+  {
+    id: "g077",
+    term: "Onboarding",
+    plain: "Pengenalan Awal",
+    definition: "Langkah pertama mengisi data usaha agar aplikasi tampil sesuai kebutuhan.",
+    example: "Isi nama toko + jenis usaha + jumlah outlet sekali saja",
     relatedModule: "Sistem",
   },
 ];

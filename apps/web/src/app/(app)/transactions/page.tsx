@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Eye, Search } from "lucide-react";
+import { Eye, Receipt, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +112,14 @@ export default function TransactionsPage() {
           </div>
         ) : items.length === 0 ? (
           <EmptyState
+            icon={<Receipt className="size-7" />}
             title="Transaksi tidak ditemukan"
             description="Transaksi baru akan muncul di sini setelah checkout di layar kasir."
+            action={
+              <Button asChild size="sm" variant="outline">
+                <Link href="/pos">Buka Kasir</Link>
+              </Button>
+            }
           />
         ) : (
           <Table>

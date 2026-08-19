@@ -17,6 +17,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { CardSkeleton } from "@/components/shared/skeletons";
 import { EmptyState, ErrorState } from "@/components/shared/states";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { TransferForm } from "@/components/warehouses/transfer-form";
 import { AdjustmentForm } from "@/components/warehouses/adjustment-form";
 import { WarehouseFormDialog } from "@/components/warehouses/warehouse-form-dialog";
@@ -204,11 +208,15 @@ export default function WarehousesPage() {
         title="Gudang"
         description={`${formatNumber(stats.active)} gudang aktif · ${formatNumber(stats.sku)} SKU · ${formatNumber(stats.qty)} item stok`}
         actions={
-          isManager ? (
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="mr-1 size-3.5" /> Tambah Gudang
-            </Button>
-          ) : undefined
+          <>
+            <ModuleHelpButton moduleId="warehouses" />
+            <ModuleIntroBadge moduleId="warehouses" />
+            {isManager && (
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <Plus className="mr-1 size-3.5" /> Tambah Gudang
+              </Button>
+            )}
+          </>
         }
       />
 

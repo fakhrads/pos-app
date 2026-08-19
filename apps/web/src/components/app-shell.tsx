@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -26,6 +26,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn, ROLE_LABEL } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import type { Role } from "@/lib/types";
+import { OnboardingWizard, useOnboardingPending } from "@/components/onboarding/onboarding-wizard";
+import { PracticeModeBanner } from "@/components/onboarding/practice-mode-banner";
 
 interface NavItem {
   href: string;
@@ -143,6 +145,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
   const router = useRouter();
 
+  // Onboarding wizard — tampil sekali saat pertama kali buka
+  const onboardingPending = useOnboardingPending();
+  const [wizardOpen, setWizardOpen] = useState(false);
+
+  useEffect(() => {
+    if (onboardingPending) setWizardOpen(true);
+  }, [onboardingPending]);
+
   return (
     <div className="flex min-h-screen bg-background">
       {/* Sidebar desktop */}
@@ -167,6 +177,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <main className="min-w-0 flex-1">
+        {/* Banner Mode Latihan (RC-03) */}
+        <PracticeModeBanner />
         <div className="p-4 md:p-6">
           <div className="mb-4 flex items-center justify-between md:hidden">
             <span className="text-sm font-semibold">FakhriPOS</span>
@@ -184,6 +196,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      {/* Onboarding Wizard — full-screen, pertama kali */}
+      <OnboardingWizard
+        open={wizardOpen}
+        onComplete={() => setWizardOpen(false)}
+      />
     </div>
   );
 }

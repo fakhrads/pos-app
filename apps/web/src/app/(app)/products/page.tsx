@@ -38,6 +38,10 @@ import { PageHeader } from "@/components/page-header";
 import { PaginationControl } from "@/components/pagination-control";
 import { EmptyState, ErrorState } from "@/components/shared/states";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { StockBadge } from "@/components/products/stock-badge";
 import { RowMenu } from "@/components/products/row-menu";
 import { ProductFormDialog } from "@/components/products/product-form-dialog";
@@ -181,37 +185,41 @@ export default function ProductsPage() {
         title="Produk"
         description="Kelola barang, varian, dan satuan."
         actions={
-          canManage && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="h-12 sm:h-10"
-                onClick={() => setImportOpen(true)}
-              >
-                <FileUp className="size-4" />
-                Import Excel
-              </Button>
-              <Button
-                variant="outline"
-                className="h-12 sm:h-10"
-                onClick={handleExport}
-                disabled={exporting}
-              >
-                <FileDown className="size-4" />
-                {exporting ? "Mengekspor…" : "Export Excel"}
-              </Button>
-              <Button
-                className="h-12 sm:h-10"
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
-                <PackagePlus className="size-4" />
-                Tambah Produk
-              </Button>
-            </div>
-          )
+          <>
+            <ModuleHelpButton moduleId="products" />
+            <ModuleIntroBadge moduleId="products" />
+            {canManage && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  className="h-12 sm:h-10"
+                  onClick={() => setImportOpen(true)}
+                >
+                  <FileUp className="size-4" />
+                  Import Excel
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 sm:h-10"
+                  onClick={handleExport}
+                  disabled={exporting}
+                >
+                  <FileDown className="size-4" />
+                  {exporting ? "Mengekspor…" : "Export Excel"}
+                </Button>
+                <Button
+                  className="h-12 sm:h-10"
+                  onClick={() => {
+                    setEditing(null);
+                    setFormOpen(true);
+                  }}
+                >
+                  <PackagePlus className="size-4" />
+                  Tambah Produk
+                </Button>
+              </div>
+            )}
+          </>
         }
       />
 
