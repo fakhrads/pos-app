@@ -475,7 +475,13 @@ export async function computeTransaction(
   };
 }
 
-function processPayments(raw: PaymentInput[], total: number): ComputedPayment[] {
+/**
+ * Pisah pembayaran (split payment, US-03 / SPEC §4.5): mengalokasikan total
+ * transaksi ke 1+ metode (cash/qris/transfer) hingga jumlah persis total.
+ * Dipanggil saat checkout (computeTransaction) dan diuji isolasi di unit test.
+ * Cash menghitung kembalian; nominal melebihi sisa → PAYMENT_MISMATCH.
+ */
+export function processPayments(raw: PaymentInput[], total: number): ComputedPayment[] {
   if (!raw || raw.length === 0) fail('PAYMENT_MISMATCH', 'Minimal 1 metode pembayaran', 422, { total });
   let remaining = total;
   const out: ComputedPayment[] = [];
