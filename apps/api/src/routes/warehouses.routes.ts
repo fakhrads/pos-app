@@ -227,7 +227,11 @@ const kasirRoutes = new Elysia()
     }
     const where = and(...conds);
 
-    const countRows = await db.select({ total: sql<number>`count(*)::int` }).from(warehouseStocks).where(where);
+    const countRows = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(warehouseStocks)
+      .innerJoin(products, eq(products.id, warehouseStocks.productId))
+      .where(where);
     const total = num(countRows[0]?.total);
 
     // Sort: lowStock default quantity ASC (AC-02.2); lain default name ASC

@@ -20,6 +20,7 @@ import { StatCard } from "@/components/stat-card";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ManagerOnly } from "@/components/role-guard";
+import { LowStockWidget } from "@/components/dashboard/low-stock-widget";
 import { api } from "@/lib/api";
 import {
   formatDateTime,
@@ -94,8 +95,8 @@ export default function DashboardPage() {
               variant={data.lowStockCount > 0 ? "warning" : "default"}
               hint={
                 data.lowStockCount > 0 ? (
-                  <Link href="/reports?tab=low-stock" className="text-accent hover:text-accent-hover underline transition-smooth">
-                    Lihat laporan stok
+                  <Link href="/warehouses" className="text-accent hover:text-accent-hover underline transition-smooth">
+                    Lihat halaman stok
                   </Link>
                 ) : (
                   "Semua aman"
@@ -145,7 +146,7 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-3">
             {/* Transaksi terbaru */}
             <Card className="overflow-hidden">
               <CardHeader className="flex-row items-center justify-between space-y-0 pb-0">
@@ -222,6 +223,9 @@ export default function DashboardPage() {
                 ))}
               </CardContent>
             </Card>
+
+            {/* Stok menipis — widget Fase 3 (GET /reports/low-stock?perPage=10) */}
+            <LowStockWidget />
           </div>
         </div>
       )}

@@ -478,14 +478,22 @@ export interface TopProductRow {
   revenue: number;
 }
 
+/** Baris laporan stok menipis (GET /reports/low-stock, Fase 3 §4.6) */
 export interface LowStockRow {
-  id: string;
+  productId: string;
   name: string;
   sku?: string | null;
-  stockOnHand: number;
-  minStock: number;
-  costPrice: number;
+  barcode?: string | null;
   unit: string;
+  /** Fase 3: varian = baris sendiri (AC-06.3) */
+  variantId?: string | null;
+  variantName?: string | null;
+  /** Σ stok gudang aktif (tanpa warehouseId) / qty gudang (dengan warehouseId) */
+  totalStock: number;
+  minStock: number;
+  productMinStock: number;
+  /** Rincian stok per gudang aktif */
+  warehouseBreakdown: { warehouseId: string; warehouseName: string; quantity: number }[];
 }
 
 export interface PaymentMethodRow {

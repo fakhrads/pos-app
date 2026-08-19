@@ -312,7 +312,7 @@ function ProfitReport() {
   );
 }
 
-// ================= Stok Menipis =================
+// ================= Stok Menipis (Fase 3: { rows, meta } + breakdown per gudang) =================
 function LowStockReport() {
   const [rows, setRows] = useState<LowStockRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,8 +320,11 @@ function LowStockReport() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api.get<{ items: LowStockRow[] }>("/reports/low-stock");
-      setRows(data.items);
+      const data = await api.get<{ rows: LowStockRow[]; meta: { total: number } }>(
+        "/reports/low-stock",
+        { page: 1, perPage: 100 }
+      );
+      setRows(data.rows);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan stok");
     } finally {
@@ -335,15 +338,23 @@ function LowStockReport() {
 
   function exportCSV() {
     downloadCSV("stok-menipis.csv", [
-      ["Nama", "SKU", "Stok", "Min. Stok", "Harga Beli (Rp)", "Satuan"],
-      ...rows.map((r) => [r.name, r.sku ?? "", r.stockOnHand, r.minStock, r.costPrice, r.unit]),
+      ["Nama", "Varian", "SKU", "Stok Total", "Min. Stok", "Satuan", "Rincian Gudang"],
+      ...rows.map((r) => [
+        r.name,
+        r.variantName ?? "",
+        r.sku ?? "",
+        r.totalStock,
+        r.minStock,
+        r.unit,
+        r.warehouseBreakdown.map((b) => `${b.warehouseName}:${b.quantity}`).join("; "),
+      ]),
     ]);
   }
 
   return (
     <ReportLayout
       title="Stok Menipis"
-      description="Produk dengan stok ≤ ambang batas, diurutkan dari paling menipis (termasuk stok 0)."
+      description="Produk dengan stok ≤ ambang batas (per produk / per varian), diurutkan dari paling menipis (termasuk stok 0)."
       onExport={exportCSV}
       exportDisabled={rows.length === 0}
     >
@@ -358,26 +369,35 @@ function LowStockReport() {
               <TableHead>Produk</TableHead>
               <TableHead className="text-right">Stok</TableHead>
               <TableHead className="text-right">Min. Stok</TableHead>
-              <TableHead className="text-right">Harga Beli</TableHead>
-              <TableHead className="text-right">Nilai (stok × beli)</TableHead>
+              <TableHead>Rincian per Gudang</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((r) => (
-              <TableRow key={r.id}>
+              <TableRow key={`${r.productId}-${r.variantId ?? ""}`}>
                 <TableCell>
-                  <p className="font-medium">{r.name}</p>
+                  <p className="font-medium">
+                    {r.name}
+                    {r.variantName && (
+                      <span className="text-muted-foreground"> · {r.variantName}</span>
+                    )}
+                  </p>
                   <p className="font-mono text-[11px] text-muted-foreground">{r.sku ?? "-"}</p>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Badge variant={r.stockOnHand <= 0 ? "destructive" : "secondary"}>
-                    {formatNumber(r.stockOnHand)} {r.unit}
+                  <Badge variant={r.totalStock <= 0 ? "destructive" : "secondary"}>
+                    {formatNumber(r.totalStock)} {r.unit}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">{formatNumber(r.minStock)}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.costPrice)}</TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatIDR(r.stockOnHand * r.costPrice)}
+                <TableCell>
+                  <p className="text-xs text-muted-foreground">
+                    {r.warehouseBreakdown.length > 0
+                      ? r.warehouseBreakdown
+                          .map((b) => `${b.warehouseName}: ${formatNumber(b.quantity)}`)
+                          .join(" · ")
+                      : "—"}
+                  </p>
                 </TableCell>
               </TableRow>
             ))}
