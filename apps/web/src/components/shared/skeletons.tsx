@@ -16,7 +16,7 @@ function Skeleton({
   return (
     <div
       className={cn(
-        "skeleton-base relative overflow-hidden rounded-md",
+        "skeleton relative overflow-hidden rounded-md",
         className
       )}
       {...props}

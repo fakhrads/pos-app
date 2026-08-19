@@ -41,8 +41,8 @@
   --info-subtle: #DBEAFE;
   
   /* Skeleton */
-  --skeleton-base: #E8EBED;
-  --skeleton-shine: #F4F5F7;
+  --skeleton-base: #E2E5E9;
+  --skeleton-shine: rgba(255,255,255,0.65);
   
   /* Legacy shadcn mapping */
   --background: var(--surface);
@@ -108,8 +108,8 @@
   --info-subtle: #0F1D3D;
   
   /* Skeleton — lighter than surface */
-  --skeleton-base: #1E2430;
-  --skeleton-shine: #283040;
+  --skeleton-base: #1A2030;
+  --skeleton-shine: rgba(255,255,255,0.07);
   
   /* Legacy shadcn mapping */
   --background: var(--surface);
@@ -306,42 +306,39 @@
   }
 
   /* ============================================================
-     SKELETON — Shimmer gradient animation
-     Light: #E8EBED → #F4F5F7
-     Dark: #1E2430 → #283040
-     Durasi: ~1.5s, arah: kiri→kanan
-     Hormati prefers-reduced-motion
+     SKELETON — Shimmer gradient animation (GPU-composited)
+     Pseudo-element + transform, bukan background-position
      ============================================================ */
-  .skeleton-base {
-    background: var(--skeleton-base);
+  .skeleton {
     position: relative;
     overflow: hidden;
+    background-color: var(--skeleton-base);
+    border-radius: var(--radius-sm);
   }
-  .skeleton-base::after {
+  .skeleton::after {
     content: "";
     position: absolute;
     inset: 0;
+    transform: translateX(-100%);
     background: linear-gradient(
       90deg,
       transparent 0%,
       var(--skeleton-shine) 50%,
       transparent 100%
     );
-    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
   }
   @keyframes skeleton-shimmer {
-    0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
   }
-  /* Hormati reduced motion */
+  /* Reduced motion: shimmer off, pulse on skeleton */
   @media (prefers-reduced-motion: reduce) {
-    .skeleton-base::after {
-      animation: skeleton-pulse 2s ease-in-out infinite;
-    }
-    @keyframes skeleton-pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 0.8; }
-    }
+    .skeleton::after { animation: none; opacity: 0; }
+    .skeleton { animation: skeleton-pulse 2s ease-in-out infinite; }
+  }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .6; }
   }
 
   /* Table density — 48px row height */
