@@ -1,38 +1,72 @@
 import type { ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+
+type StatCardVariant = "default" | "accent" | "success" | "warning" | "destructive";
+
+const variantStyles: Record<StatCardVariant, { iconBg: string; iconText: string }> = {
+  default: {
+    iconBg: "bg-muted",
+    iconText: "text-muted-foreground",
+  },
+  accent: {
+    iconBg: "bg-accent-muted",
+    iconText: "text-accent",
+  },
+  success: {
+    iconBg: "bg-success-muted",
+    iconText: "text-success",
+  },
+  warning: {
+    iconBg: "bg-warning-muted",
+    iconText: "text-warning",
+  },
+  destructive: {
+    iconBg: "bg-destructive/10",
+    iconText: "text-destructive",
+  },
+};
 
 export function StatCard({
   title,
   value,
   icon,
   hint,
+  variant = "default",
   className,
 }: {
   title: string;
   value: ReactNode;
   icon?: ReactNode;
   hint?: ReactNode;
+  variant?: StatCardVariant;
   className?: string;
 }) {
+  const styles = variantStyles[variant];
+
   return (
-    <Card className={cn("overflow-hidden", className)}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground">{title}</p>
-            <p className="mt-1.5 truncate text-2xl font-semibold tracking-tight">
-              {value}
-            </p>
-            {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+    <div
+      className={cn(
+        "bg-card rounded-xl border border-border p-5 card-hover transition-smooth",
+        className
+      )}
+    >
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          {title}
+        </span>
+        {icon && (
+          <div
+            className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+              styles.iconBg
+            )}
+          >
+            <span className={cn("w-4 h-4", styles.iconText)}>{icon}</span>
           </div>
-          {icon && (
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-              {icon}
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        )}
+      </div>
+      <p className="text-2xl font-bold stat-number">{value}</p>
+      {hint && <div className="mt-2 text-xs text-muted-foreground">{hint}</div>}
+    </div>
   );
 }

@@ -55,18 +55,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const items = NAV_ITEMS.filter((i) => user && i.roles.includes(user.role));
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="flex items-center gap-2 px-4 py-4">
-        <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Store className="size-5" />
+    <div className="flex h-full flex-col">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-border">
+        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-cyan-600">
+          <Store className="size-4 text-background" />
         </div>
         <div className="leading-tight">
           <p className="text-sm font-semibold">FakhriPOS</p>
-          <p className="text-[11px] text-muted-foreground">Point of Sales</p>
+          <p className="text-[10px] text-muted-foreground">v0.1.0</p>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-3">
+      {/* Navigation */}
+      <ScrollArea className="flex-1 px-3 py-4">
         <nav className="flex flex-col gap-1">
           {items.map((item) => {
             const active =
@@ -77,10 +79,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-smooth",
                   active
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground"
+                    ? "nav-active text-accent"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
               >
                 <item.icon className="size-4 shrink-0" />
@@ -91,10 +93,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         </nav>
       </ScrollArea>
 
-      <div className="border-t px-3 py-3">
-        <div className="flex items-center gap-3 px-1 py-1">
-          <Avatar className="size-8">
-            <AvatarFallback className="text-xs">
+      {/* User section */}
+      <div className="border-t border-border p-4">
+        <div className="flex items-center gap-3">
+          <Avatar className="size-9">
+            <AvatarFallback className="text-xs bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
               {user?.name?.slice(0, 2).toUpperCase() ?? "?"}
             </AvatarFallback>
           </Avatar>
@@ -108,6 +111,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             variant="ghost"
             size="icon"
             title="Keluar"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-smooth"
             onClick={async () => {
               await logout();
               router.replace("/login");
@@ -127,9 +131,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar desktop */}
-      <aside className="hidden w-60 shrink-0 border-r bg-sidebar md:block">
+      <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar md:block">
         <SidebarContent />
       </aside>
 
@@ -144,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu className="size-5" />
           </Button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-64 p-0 border-border bg-sidebar">
           <SidebarContent onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>

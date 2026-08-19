@@ -72,25 +72,29 @@ export default function DashboardPage() {
               title="Penjualan Hari Ini"
               value={formatIDR(data.todayRevenue)}
               icon={<TrendingUp className="size-4" />}
+              variant="accent"
             />
             <StatCard
               title="Transaksi"
               value={formatNumber(data.todayTransactions)}
               icon={<Receipt className="size-4" />}
               hint={`Rata-rata ${formatIDR(data.avgPerTransaction)} / transaksi`}
+              variant="default"
             />
             <StatCard
               title="Item Terjual"
               value={formatNumber(data.todayItemsSold)}
               icon={<ShoppingBag className="size-4" />}
+              variant="success"
             />
             <StatCard
               title="Stok Menipis"
               value={formatNumber(data.lowStockCount)}
               icon={<AlertTriangle className="size-4" />}
+              variant={data.lowStockCount > 0 ? "warning" : "default"}
               hint={
                 data.lowStockCount > 0 ? (
-                  <Link href="/reports?tab=low-stock" className="underline">
+                  <Link href="/reports?tab=low-stock" className="text-accent hover:text-accent-hover underline transition-smooth">
                     Lihat laporan stok
                   </Link>
                 ) : (
@@ -143,16 +147,16 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             {/* Transaksi terbaru */}
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm">Transaksi Terbaru</CardTitle>
-                <Button variant="ghost" size="sm" asChild>
+            <Card className="overflow-hidden">
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-0">
+                <CardTitle className="text-sm font-semibold">Transaksi Terbaru</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-accent transition-smooth">
                   <Link href="/transactions">
                     Semua <ArrowRight className="ml-1 size-3" />
                   </Link>
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-1">
+              <CardContent className="space-y-1 pt-4">
                 {data.recentTransactions.length === 0 && (
                   <EmptyState title="Belum ada transaksi hari ini" />
                 )}
@@ -160,51 +164,60 @@ export default function DashboardPage() {
                   <Link
                     key={tx.id}
                     href={`/transactions/${tx.id}`}
-                    className="flex items-center justify-between rounded-md px-2 py-2 hover:bg-accent"
+                    className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-smooth group"
                   >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{tx.invoiceNumber}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDateTime(tx.soldAt)} · {tx.user?.name}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-xs font-mono text-muted-foreground group-hover:text-accent transition-smooth shrink-0">
+                        #{tx.invoiceNumber.slice(-3)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{tx.invoiceNumber}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {formatDateTime(tx.soldAt)} · {tx.user?.name}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm font-semibold">{formatIDR(tx.total)}</p>
+                    <p className="text-sm font-semibold font-mono shrink-0">{formatIDR(tx.total)}</p>
                   </Link>
                 ))}
               </CardContent>
             </Card>
 
             {/* Produk terlaris hari ini */}
-            <Card>
-              <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-sm">Produk Terlaris Hari Ini</CardTitle>
-                <Button variant="ghost" size="sm" asChild>
+            <Card className="overflow-hidden">
+              <CardHeader className="flex-row items-center justify-between space-y-0 pb-0">
+                <CardTitle className="text-sm font-semibold">Produk Terlaris Hari Ini</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-accent transition-smooth">
                   <Link href="/reports?tab=top-products">
                     Laporan <ArrowRight className="ml-1 size-3" />
                   </Link>
                 </Button>
               </CardHeader>
-              <CardContent className="space-y-1">
+              <CardContent className="space-y-1 pt-4">
                 {data.topProductsToday.length === 0 && (
                   <EmptyState title="Belum ada produk terjual" />
                 )}
                 {data.topProductsToday.map((p, i) => (
                   <div
                     key={`${p.productName}-${i}`}
-                    className="flex items-center justify-between rounded-md px-2 py-2"
+                    className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-muted/50 transition-smooth"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                      <div className={`flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+                        i === 0 ? "bg-accent-muted text-accent" :
+                        i === 1 ? "bg-violet-500/15 text-violet-400" :
+                        "bg-success-muted text-success"
+                      }`}>
                         {i + 1}
-                      </span>
+                      </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{p.productName}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           {formatNumber(p.quantity)} terjual
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm font-semibold">{formatIDR(p.revenue)}</p>
+                    <p className="text-sm font-semibold font-mono">{formatIDR(p.revenue)}</p>
                   </div>
                 ))}
               </CardContent>
@@ -219,22 +232,31 @@ export default function DashboardPage() {
 /** Bar chart sederhana tanpa dependensi chart */
 function BarChart({ data }: { data: { date: string; revenue: number }[] }) {
   const max = Math.max(...data.map((d) => d.revenue), 1);
+  const today = new Date().toISOString().split("T")[0];
+  
   return (
-    <div className="flex h-40 items-end gap-1.5">
-      {data.map((d) => (
-        <div key={d.date} className="group flex flex-1 flex-col items-center gap-1">
-          <div className="relative flex w-full flex-1 items-end">
-            <div
-              className="w-full rounded-t bg-primary/80 transition-colors group-hover:bg-primary"
-              style={{ height: `${Math.max((d.revenue / max) * 100, 2)}%` }}
-              title={`${d.date}: ${formatIDR(d.revenue)}`}
-            />
+    <div className="flex h-48 items-end gap-2">
+      {data.map((d) => {
+        const isToday = d.date === today;
+        return (
+          <div key={d.date} className="group flex flex-1 flex-col items-center gap-2">
+            <div className="relative flex w-full flex-1 items-end justify-center">
+              <div
+                className={`w-full max-w-[40px] rounded-t bar-fill transition-colors ${
+                  isToday
+                    ? "bg-gradient-to-t from-accent/80 to-accent ring-2 ring-accent/30"
+                    : "bg-gradient-to-t from-accent/40 to-accent/70 group-hover:from-accent/60 group-hover:to-accent"
+                }`}
+                style={{ height: `${Math.max((d.revenue / max) * 100, 2)}%` }}
+                title={`${d.date}: ${formatIDR(d.revenue)}`}
+              />
+            </div>
+            <span className={`text-[10px] ${isToday ? "text-accent font-medium" : "text-muted-foreground"}`}>
+              {new Date(d.date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short" })}
+            </span>
           </div>
-          <span className="text-[9px] text-muted-foreground">
-            {new Date(d.date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short" })}
-          </span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
