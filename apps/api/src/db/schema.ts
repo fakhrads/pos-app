@@ -747,6 +747,40 @@ export const heldCarts = pgTable(
   ],
 );
 
+/* ------------------------------------------------------------------ */
+/* 26. CASH_MOVEMENTS — kas masuk/keluar manual (Fase 5, SPEC §4.6)     */
+/*     Mencatat setoran kasir, tarikan (prive), pengeluaran operasional */
+/*     di luar penjualan. `direction` = 'in' (masuk) / 'out' (keluar).  */
+/*     Numerik rupiah (BIGINT); amount > 0. Tidak ada relasi ke         */
+/*     transaksi — murni mutasi kas manual.                             */
+/* ------------------------------------------------------------------ */
+export const cashMovementDirection = pgEnum('cash_movement_direction', ['in', 'out']);
+
+export const cashMovements = pgTable(
+  'cash_movements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    outletId: bigint('outlet_id', { mode: 'number' }).notNull().default(1),
+    // 'in' = kas masuk (setoran, modal, dsb) · 'out' = kas keluar (pengeluaran, prive, dsb)
+    direction: cashMovementDirection('direction').notNull(),
+    amount: bigint('amount', { mode: 'number' }).notNull(),
+    method: paymentMethod('method').notNull().default('cash'),
+    category: varchar('category', { length: 50 }),
+    note: text('note'),
+    reference: varchar('reference', { length: 100 }),
+    movementAt: timestamp('movement_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_cash_movements_movement_at').on(t.movementAt),
+    index('idx_cash_movements_direction').on(t.direction),
+    index('idx_cash_movements_created_by').on(t.createdBy),
+    check('ck_cash_movements_amount', sql`${t.amount} > 0`),
+  ],
+);
+
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -777,6 +811,8 @@ export type NewStockTransfer = typeof stockTransfers.$inferInsert;
 export type StockAdjustment = typeof stockAdjustments.$inferSelect;
 export type NewStockAdjustment = typeof stockAdjustments.$inferInsert;
 export type Shift = typeof shifts.$inferSelect;
+export type CashMovement = typeof cashMovements.$inferSelect;
+export type NewCashMovement = typeof cashMovements.$inferInsert;
 export type NewShift = typeof shifts.$inferInsert;
 export type HeldCart = typeof heldCarts.$inferSelect;
 export type NewHeldCart = typeof heldCarts.$inferInsert;

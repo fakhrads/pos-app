@@ -21,6 +21,7 @@ const DDL_PATH = path.join(__dirname, 'ddl.sql');
 const DDL_PHASE2_PATH = path.join(__dirname, 'ddl-phase2.sql');
 const DDL_PHASE3_PATH = path.join(__dirname, 'ddl-phase3.sql');
 const DDL_PHASE4_PATH = path.join(__dirname, 'ddl-phase4.sql');
+const DDL_PHASE5_PATH = path.join(__dirname, 'ddl-phase5.sql');
 
 async function main(): Promise<void> {
   console.log('[migrate] target:', env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
@@ -45,6 +46,11 @@ async function main(): Promise<void> {
   // Tidak ada ALTER tabel existing (keputusan §1.3.3 — atribusi shift via window waktu).
   await client.unsafe(readFileSync(DDL_PHASE4_PATH, 'utf-8'));
   console.log('[migrate] DDL Fase 4 selesai (shifts, held_carts, enum shift_status, +7 key settings).');
+
+  // Fase 5 (SPEC §4/§8): DDL idempotent — 1 tabel baru (cash_movements), 1 enum,
+  // index pendukung laporan stok/dead stock, +5 key settings laporan.
+  await client.unsafe(readFileSync(DDL_PHASE5_PATH, 'utf-8'));
+  console.log('[migrate] DDL Fase 5 selesai (cash_movements, enum cash_movement_direction, +index, +5 key settings).');
 
   // ---------- Seed admin awal ----------
   if (!env.SEED_ADMIN_EMAIL || !env.SEED_ADMIN_PASSWORD) {

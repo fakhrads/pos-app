@@ -22,6 +22,7 @@ import { returnsRoutes } from './routes/returns.routes';
 import { shiftsRoutes } from './routes/shifts.routes';
 import { heldCartsRoutes } from './routes/held-carts.routes';
 import { reportsRoutes } from './routes/reports.routes';
+import { cashMovementsRoutes } from './routes/cash-movements.routes';
 import { auditLogsRoutes } from './routes/audit-logs.routes';
 import { settingsRoutes } from './routes/settings.routes';
 import { warehousesRoutes } from './routes/warehouses.routes';
@@ -114,6 +115,7 @@ const app = new Elysia()
       .use(shiftsRoutes)
       .use(heldCartsRoutes)
       .use(reportsRoutes)
+      .use(cashMovementsRoutes)
       .use(auditLogsRoutes)
       .use(settingsRoutes)
       .use(warehousesRoutes)
