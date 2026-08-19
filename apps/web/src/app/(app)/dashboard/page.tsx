@@ -6,11 +6,10 @@ import {
   AlertTriangle,
   ArrowRight,
   Banknote,
-  Package,
   Receipt,
   ShoppingBag,
   TrendingUp,
-  Users,
+  Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,11 +26,13 @@ import {
   formatIDR,
   formatNumber,
   PAYMENT_METHOD_LABEL,
+  todayWIB,
 } from "@/lib/utils";
-import type { DashboardData } from "@/lib/types";
+import type { DashboardData, IncomeStatementResult } from "@/lib/types";
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [profit, setProfit] = useState<IncomeStatementResult["summary"] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +40,12 @@ export default function DashboardPage() {
       .get<DashboardData>("/reports/dashboard")
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : "Gagal memuat dashboard"));
+
+    const today = todayWIB();
+    api
+      .get<IncomeStatementResult>("/reports/income-statement", { from: today, to: today })
+      .then((d) => setProfit(d.summary))
+      .catch(() => setProfit(null));
   }, []);
 
   return (
@@ -60,15 +67,15 @@ export default function DashboardPage() {
       )}
 
       {!data ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-lg" />
           ))}
         </div>
       ) : (
         <div className="space-y-6">
           {/* Statistik hari ini */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard
               title="Penjualan Hari Ini"
               value={formatIDR(data.todayRevenue)}
@@ -87,6 +94,17 @@ export default function DashboardPage() {
               value={formatNumber(data.todayItemsSold)}
               icon={<ShoppingBag className="size-4" />}
               variant="success"
+            />
+            <StatCard
+              title="Laba Kotor Hari Ini"
+              value={profit ? formatIDR(profit.grossProfit) : "…"}
+              icon={<Wallet className="size-4" />}
+              variant={profit && profit.grossProfit < 0 ? "destructive" : "default"}
+              hint={
+                profit
+                  ? `Margin ${profit.revenue ? Math.round((profit.grossProfit / profit.revenue) * 100) : 0}% dari pendapatan`
+                  : "Memuat…"
+              }
             />
             <StatCard
               title="Stok Menipis"

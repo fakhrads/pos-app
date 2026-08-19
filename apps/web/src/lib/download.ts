@@ -40,3 +40,4 @@ export async function apiDownload(path: string, filename: string): Promise<void>
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+

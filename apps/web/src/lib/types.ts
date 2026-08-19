@@ -667,3 +667,147 @@ export interface HeldCartListItem extends HeldCart {
   itemCount: number;
   totalQuantity: number;
 }
+
+// ============================================================
+// Fase 5 — Laporan & Dashboard (SPEC §4) & Kas masuk/keluar (§4.6)
+// ============================================================
+
+export type SalesOverviewGroup = "day" | "week" | "month";
+
+/** GET /reports/sales-overview?groupBy=day|week|month */
+export interface SalesOverviewRow {
+  period: string;
+  revenue: number;
+  transactionCount: number;
+  itemsSold: number;
+  avgPerTransaction: number;
+}
+
+export interface SalesOverviewResult {
+  groupBy: SalesOverviewGroup;
+  rows: SalesOverviewRow[];
+}
+
+/** GET /reports/sales-by-product */
+export interface SalesByProductRow {
+  productId: string;
+  productName: string;
+  productSku?: string | null;
+  qtySold: number;
+  revenue: number;
+  cogs: number;
+}
+
+/** GET /reports/sales-by-category */
+export interface SalesByCategoryRow {
+  categoryId: string;
+  categoryName?: string | null;
+  qtySold: number;
+  revenue: number;
+}
+
+/** GET /reports/sales-by-cashier */
+export interface SalesByCashierRow {
+  cashierId: string;
+  cashierName?: string | null;
+  transactionCount: number;
+  revenue: number;
+  itemsSold: number;
+}
+
+/** GET /reports/inventory-value */
+export interface InventoryValueRow {
+  categoryId: string;
+  categoryName?: string | null;
+  productCount: number;
+  totalQty: number;
+  value: number;
+}
+
+export interface InventoryValueResult {
+  rows: InventoryValueRow[];
+  summary: { totalValue: number; valuation: "cost" | "selling" };
+}
+
+/** GET /reports/dead-stock */
+export interface DeadStockRow {
+  productId: string;
+  name: string;
+  sku?: string | null;
+  categoryName?: string | null;
+  stockQty: number;
+  costValue: number;
+  sellingValue: number;
+  days: number;
+}
+
+export interface DeadStockResult {
+  rows: DeadStockRow[];
+  summary: { days: number; count: number; totalCostValue: number };
+}
+
+/** GET /reports/income-statement — laba rugi sederhana */
+export interface IncomeStatementRow {
+  label: string;
+  value: number;
+}
+
+export interface IncomeStatementResult {
+  period: { from: string; to: string };
+  summary: {
+    revenue: number;
+    cogs: number;
+    grossProfit: number;
+    operatingExpenses: number;
+    netProfit: number;
+  };
+  rows?: IncomeStatementRow[];
+}
+
+/** GET /reports/cash-flow */
+export interface CashFlowResult {
+  period: { from: string; to: string };
+  summary: { cashIn: number; cashOut: number; net: number };
+  rows?: IncomeStatementRow[];
+}
+
+// ---------- Kas masuk / kas keluar (Fase 5 §4.6) ----------
+export type CashDirection = "in" | "out";
+
+export interface CashMovement {
+  id: string;
+  direction: CashDirection;
+  amount: number;
+  method: PaymentMethod;
+  category?: string | null;
+  note?: string | null;
+  reference?: string | null;
+  movementAt: string;
+  createdBy?: { id: string; name: string } | null;
+}
+
+export interface CashMovementPayload {
+  direction: CashDirection;
+  amount: number;
+  method?: PaymentMethod;
+  category?: string | null;
+  note?: string | null;
+  reference?: string | null;
+  movementAt?: string;
+}
+
+export interface CashMovementListResult {
+  items: CashMovement[];
+  summary: {
+    in: { total: number; count: number };
+    out: { total: number; count: number };
+  };
+  meta: PaginationMeta;
+}
+
+/** Label arah mutasi kas */
+export const CASH_DIRECTION_LABEL: Record<CashDirection, string> = {
+  in: "Kas Masuk",
+  out: "Kas Keluar",
+};
+

@@ -1,14 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Download, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -18,40 +14,53 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { api, ApiError } from "@/lib/api";
-import { downloadCSV, formatIDR, formatNumber, lastNDaysWIB, PAYMENT_METHOD_LABEL, todayWIB } from "@/lib/utils";
+import { formatIDR, formatNumber, lastNDaysWIB, todayWIB } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
-import type { LowStockRow, PaymentMethodRow, ProfitRow, SalesDailyRow, TopProductRow } from "@/lib/types";
+import { DateRange, ExportButtons, MiniStat, ReportCard } from "@/components/reports/report-ui";
+import { SalesOverviewReport } from "@/components/reports/sales-overview";
+import { SalesByProductReport } from "@/components/reports/sales-by-product";
+import { SalesByCategoryReport } from "@/components/reports/sales-by-category";
+import { SalesByCashierReport } from "@/components/reports/sales-by-cashier";
+import { IncomeStatementReport } from "@/components/reports/income-statement";
+import { CashFlowReport } from "@/components/reports/cash-flow";
+import { InventoryValueReport } from "@/components/reports/inventory-value";
+import { DeadStockReport } from "@/components/reports/dead-stock";
+import { CashMovementsReport } from "@/components/reports/cash-movements";
+import type { LowStockRow, TopProductRow } from "@/lib/types";
 
-type TabId = "sales" | "profit" | "low-stock" | "top-products";
+type TabId = "sales" | "finance" | "stock" | "top-products" | "cash";
 
 export default function ReportsPage() {
   const searchParams = useSearchParams();
   const { isManager } = useAuth();
+
+  // Kompatibel dengan tautan lama (?tab=low-stock / top-products / profit)
+  const legacyTab = searchParams.get("tab");
   const initialTab: TabId =
-    searchParams.get("tab") === "low-stock"
-      ? "low-stock"
-      : searchParams.get("tab") === "top-products"
+    legacyTab === "low-stock"
+      ? "stock"
+      : legacyTab === "top-products"
         ? "top-products"
-        : searchParams.get("tab") === "profit" && isManager
-          ? "profit"
+        : legacyTab === "profit" && isManager
+          ? "finance"
           : "sales";
 
   const tabs: { id: TabId; label: string; managerOnly?: boolean }[] = [
     { id: "sales", label: "Penjualan" },
-    { id: "profit", label: "Laba", managerOnly: true },
-    { id: "low-stock", label: "Stok Menipis", managerOnly: true },
+    { id: "finance", label: "Keuangan", managerOnly: true },
+    { id: "stock", label: "Stok", managerOnly: true },
     { id: "top-products", label: "Produk Terlaris" },
+    { id: "cash", label: "Kas", managerOnly: true },
   ];
 
   return (
     <>
       <PageHeader
         title="Laporan"
-        description="Pantau penjualan, laba, dan kondisi stok. Semua laporan bisa diexport CSV."
+        description="Pantau penjualan, laba, kondisi stok, dan arus kas. Semua laporan bisa diexport Excel/PDF/CSV."
       />
       <Tabs defaultValue={initialTab}>
         <TabsList className="flex-wrap">
@@ -63,252 +72,79 @@ export default function ReportsPage() {
               </TabsTrigger>
             ))}
         </TabsList>
-        <TabsContent value="sales">
-          <SalesReport />
+
+        <TabsContent value="sales" className="mt-4">
+          <Tabs defaultValue="overview">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="overview">Ringkasan</TabsTrigger>
+              <TabsTrigger value="product">Per Produk</TabsTrigger>
+              <TabsTrigger value="category">Per Kategori</TabsTrigger>
+              <TabsTrigger value="cashier">Per Kasir</TabsTrigger>
+            </TabsList>
+            <TabsContent value="overview" className="mt-4">
+              <SalesOverviewReport />
+            </TabsContent>
+            <TabsContent value="product" className="mt-4">
+              <SalesByProductReport />
+            </TabsContent>
+            <TabsContent value="category" className="mt-4">
+              <SalesByCategoryReport />
+            </TabsContent>
+            <TabsContent value="cashier" className="mt-4">
+              <SalesByCashierReport />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
+
         {isManager && (
-          <TabsContent value="profit">
-            <ProfitReport />
+          <TabsContent value="finance" className="mt-4">
+            <Tabs defaultValue="income">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="income">Laba Rugi</TabsTrigger>
+                <TabsTrigger value="cashflow">Arus Kas</TabsTrigger>
+              </TabsList>
+              <TabsContent value="income" className="mt-4">
+                <IncomeStatementReport />
+              </TabsContent>
+              <TabsContent value="cashflow" className="mt-4">
+                <CashFlowReport />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
+
         {isManager && (
-          <TabsContent value="low-stock">
-            <LowStockReport />
+          <TabsContent value="stock" className="mt-4">
+            <Tabs defaultValue="low-stock">
+              <TabsList className="flex-wrap">
+                <TabsTrigger value="low-stock">Stok Menipis</TabsTrigger>
+                <TabsTrigger value="inventory">Nilai Persediaan</TabsTrigger>
+                <TabsTrigger value="dead-stock">Dead Stock</TabsTrigger>
+              </TabsList>
+              <TabsContent value="low-stock" className="mt-4">
+                <LowStockReport />
+              </TabsContent>
+              <TabsContent value="inventory" className="mt-4">
+                <InventoryValueReport />
+              </TabsContent>
+              <TabsContent value="dead-stock" className="mt-4">
+                <DeadStockReport />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
-        <TabsContent value="top-products">
+
+        <TabsContent value="top-products" className="mt-4">
           <TopProductsReport />
         </TabsContent>
+
+        {isManager && (
+          <TabsContent value="cash" className="mt-4">
+            <CashMovementsReport />
+          </TabsContent>
+        )}
       </Tabs>
     </>
-  );
-}
-
-function DateRange({ from, to, setFrom, setTo }: { from: string; to: string; setFrom: (v: string) => void; setTo: (v: string) => void }) {
-  return (
-    <div className="flex items-end gap-2">
-      <div className="space-y-1">
-        <Label className="text-xs">Dari</Label>
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-40" />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-xs">Sampai</Label>
-        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-40" />
-      </div>
-    </div>
-  );
-}
-
-// ================= Penjualan =================
-function SalesReport() {
-  const [from, setFrom] = useState(todayWIB());
-  const [to, setTo] = useState(todayWIB());
-  const [rows, setRows] = useState<SalesDailyRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<{ rows: SalesDailyRow[] }>("/reports/sales-daily", { from, to });
-      setRows(data.rows);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan");
-    } finally {
-      setLoading(false);
-    }
-  }, [from, to]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const summary = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({
-          revenue: acc.revenue + r.revenue,
-          count: acc.count + r.transactionCount,
-          items: acc.items + r.itemsSold,
-          cash: acc.cash + (r.paymentBreakdown?.cash ?? 0),
-          qris: acc.qris + (r.paymentBreakdown?.qris ?? 0),
-          transfer: acc.transfer + (r.paymentBreakdown?.transfer ?? 0),
-        }),
-        { revenue: 0, count: 0, items: 0, cash: 0, qris: 0, transfer: 0 }
-      ),
-    [rows]
-  );
-
-  function exportCSV() {
-    downloadCSV(`penjualan-${from}-sampai-${to}.csv`, [
-      ["Tanggal", "Pendapatan (Rp)", "Transaksi", "Item Terjual", "Rata-rata/Transaksi (Rp)", "Tunai (Rp)", "QRIS (Rp)", "Transfer (Rp)"],
-      ...rows.map((r) => [
-        r.date,
-        r.revenue,
-        r.transactionCount,
-        r.itemsSold,
-        r.avgPerTransaction,
-        r.paymentBreakdown?.cash ?? 0,
-        r.paymentBreakdown?.qris ?? 0,
-        r.paymentBreakdown?.transfer ?? 0,
-      ]),
-      [],
-      ["TOTAL", summary.revenue, summary.count, summary.items, "", summary.cash, summary.qris, summary.transfer],
-    ]);
-  }
-
-  return (
-    <ReportLayout
-      title="Laporan Penjualan"
-      description="Penjualan per hari, termasuk breakdown metode pembayaran."
-      range={
-        <DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />
-      }
-      onExport={exportCSV}
-      exportDisabled={rows.length === 0}
-    >
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniStat label="Total Penjualan" value={formatIDR(summary.revenue)} />
-        <MiniStat label="Jumlah Transaksi" value={formatNumber(summary.count)} />
-        <MiniStat label="Item Terjual" value={formatNumber(summary.items)} />
-        <MiniStat
-          label="Rata-rata / Transaksi"
-          value={formatIDR(summary.count ? Math.round(summary.revenue / summary.count) : 0)}
-        />
-      </div>
-      <div className="mb-4 flex flex-wrap gap-2">
-        {[
-          { label: "Tunai", value: summary.cash },
-          { label: "QRIS", value: summary.qris },
-          { label: "Transfer", value: summary.transfer },
-        ].map((m) => (
-          <Badge key={m.label} variant="secondary">
-            {m.label}: {formatIDR(m.value)}
-          </Badge>
-        ))}
-      </div>
-
-      {loading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : rows.length === 0 ? (
-        <EmptyState title="Tidak ada data pada rentang ini" />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tanggal</TableHead>
-              <TableHead className="text-right">Transaksi</TableHead>
-              <TableHead className="text-right">Item</TableHead>
-              <TableHead className="text-right">Tunai</TableHead>
-              <TableHead className="text-right">QRIS</TableHead>
-              <TableHead className="text-right">Transfer</TableHead>
-              <TableHead className="text-right">Pendapatan</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.date}>
-                <TableCell className="font-medium">{r.date}</TableCell>
-                <TableCell className="text-right">{formatNumber(r.transactionCount)}</TableCell>
-                <TableCell className="text-right">{formatNumber(r.itemsSold)}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.paymentBreakdown?.cash ?? 0)}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.paymentBreakdown?.qris ?? 0)}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.paymentBreakdown?.transfer ?? 0)}</TableCell>
-                <TableCell className="text-right font-semibold">{formatIDR(r.revenue)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </ReportLayout>
-  );
-}
-
-// ================= Laba =================
-function ProfitReport() {
-  const [from, setFrom] = useState(todayWIB());
-  const [to, setTo] = useState(todayWIB());
-  const [rows, setRows] = useState<ProfitRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get<{ rows: ProfitRow[] }>("/reports/profit", { from, to, groupBy: "day" });
-      setRows(data.rows);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memuat laporan laba");
-    } finally {
-      setLoading(false);
-    }
-  }, [from, to]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const summary = useMemo(
-    () =>
-      rows.reduce(
-        (acc, r) => ({ revenue: acc.revenue + r.revenue, cost: acc.cost + r.cost, profit: acc.profit + r.profit }),
-        { revenue: 0, cost: 0, profit: 0 }
-      ),
-    [rows]
-  );
-
-  function exportCSV() {
-    downloadCSV(`laba-${from}-sampai-${to}.csv`, [
-      ["Tanggal", "Pendapatan (Rp)", "HPP (Rp)", "Laba Kotor (Rp)"],
-      ...rows.map((r) => [r.date, r.revenue, r.cost, r.profit]),
-      [],
-      ["TOTAL", summary.revenue, summary.cost, summary.profit],
-    ]);
-  }
-
-  return (
-    <ReportLayout
-      title="Laporan Laba"
-      description="Laba kotor = pendapatan − HPP (harga beli saat transaksi)."
-      range={<DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />}
-      onExport={exportCSV}
-      exportDisabled={rows.length === 0}
-    >
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
-        <MiniStat label="Pendapatan" value={formatIDR(summary.revenue)} />
-        <MiniStat label="HPP" value={formatIDR(summary.cost)} />
-        <MiniStat
-          label="Laba Kotor"
-          value={formatIDR(summary.profit)}
-          className={summary.profit >= 0 ? "text-emerald-600" : "text-destructive"}
-        />
-      </div>
-
-      {loading ? (
-        <Skeleton className="h-64 w-full" />
-      ) : rows.length === 0 ? (
-        <EmptyState title="Tidak ada data pada rentang ini" />
-      ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Tanggal</TableHead>
-              <TableHead className="text-right">Pendapatan</TableHead>
-              <TableHead className="text-right">HPP</TableHead>
-              <TableHead className="text-right">Laba Kotor</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.date}>
-                <TableCell className="font-medium">{r.date}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.revenue)}</TableCell>
-                <TableCell className="text-right">{formatIDR(r.cost)}</TableCell>
-                <TableCell className="text-right font-semibold">{formatIDR(r.profit)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      )}
-    </ReportLayout>
   );
 }
 
@@ -336,27 +172,18 @@ function LowStockReport() {
     load();
   }, [load]);
 
-  function exportCSV() {
-    downloadCSV("stok-menipis.csv", [
-      ["Nama", "Varian", "SKU", "Stok Total", "Min. Stok", "Satuan", "Rincian Gudang"],
-      ...rows.map((r) => [
-        r.name,
-        r.variantName ?? "",
-        r.sku ?? "",
-        r.totalStock,
-        r.minStock,
-        r.unit,
-        r.warehouseBreakdown.map((b) => `${b.warehouseName}:${b.quantity}`).join("; "),
-      ]),
-    ]);
-  }
-
   return (
-    <ReportLayout
+    <ReportCard
       title="Stok Menipis"
       description="Produk dengan stok ≤ ambang batas (per produk / per varian), diurutkan dari paling menipis (termasuk stok 0)."
-      onExport={exportCSV}
-      exportDisabled={rows.length === 0}
+      actions={
+        <ExportButtons
+          path="/reports/low-stock"
+          formats={["csv"]}
+          disabled={rows.length === 0}
+          buildQuery={(fmt) => `export=${fmt}`}
+        />
+      }
     >
       {loading ? (
         <Skeleton className="h-64 w-full" />
@@ -378,9 +205,7 @@ function LowStockReport() {
                 <TableCell>
                   <p className="font-medium">
                     {r.name}
-                    {r.variantName && (
-                      <span className="text-muted-foreground"> · {r.variantName}</span>
-                    )}
+                    {r.variantName && <span className="text-muted-foreground"> · {r.variantName}</span>}
                   </p>
                   <p className="font-mono text-[11px] text-muted-foreground">{r.sku ?? "-"}</p>
                 </TableCell>
@@ -404,7 +229,7 @@ function LowStockReport() {
           </TableBody>
         </Table>
       )}
-    </ReportLayout>
+    </ReportCard>
   );
 }
 
@@ -436,21 +261,19 @@ function TopProductsReport() {
     load();
   }, [load]);
 
-  function exportCSV() {
-    const top = byQty.length >= byRevenue.length ? byQty : byRevenue;
-    downloadCSV(`produk-terlaris-${from}-sampai-${to}.csv`, [
-      ["Produk", "Qty Terjual", "Revenue (Rp)"],
-      ...top.map((p, i) => [p.productName, byQty[i]?.quantity ?? 0, byRevenue[i]?.revenue ?? 0]),
-    ]);
-  }
-
   return (
-    <ReportLayout
+    <ReportCard
       title="Produk Terlaris"
       description="Top 10 produk berdasarkan qty terjual & revenue."
       range={<DateRange from={from} to={to} setFrom={setFrom} setTo={setTo} />}
-      onExport={exportCSV}
-      exportDisabled={byQty.length === 0 && byRevenue.length === 0}
+      actions={
+        <ExportButtons
+          path="/reports/top-products"
+          formats={["csv"]}
+          disabled={byQty.length === 0 && byRevenue.length === 0}
+          buildQuery={(fmt) => `from=${from}&to=${to}&limit=10&export=${fmt}`}
+        />
+      }
     >
       {loading ? (
         <Skeleton className="h-64 w-full" />
@@ -462,7 +285,7 @@ function TopProductsReport() {
           <RankTable title="By Revenue" rows={byRevenue} valueKind="revenue" />
         </div>
       )}
-    </ReportLayout>
+    </ReportCard>
   );
 }
 
@@ -490,50 +313,6 @@ function RankTable({ title, rows, valueKind }: { title: string; rows: TopProduct
           ))}
         </TableBody>
       </Table>
-    </div>
-  );
-}
-
-// ================= Layout umum laporan =================
-function ReportLayout({
-  title,
-  description,
-  range,
-  onExport,
-  exportDisabled,
-  children,
-}: {
-  title: string;
-  description: string;
-  range?: React.ReactNode;
-  onExport: () => void;
-  exportDisabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="text-sm">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {range}
-          <Button variant="outline" size="sm" onClick={onExport} disabled={exportDisabled}>
-            <Download className="size-4" /> Export CSV
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
-function MiniStat({ label, value, className = "" }: { label: string; value: string; className?: string }) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-xl font-semibold ${className}`}>{value}</p>
     </div>
   );
 }
