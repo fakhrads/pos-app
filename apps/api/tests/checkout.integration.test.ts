@@ -8,8 +8,9 @@
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { client, db } from '../src/db';
-import { products, productVariants, productUnits, categories, users, transactions, transactionItems, stockMovements } from '../src/db/schema';
+import { products, productVariants, productUnits, categories, users, transactions, transactionItems, stockMovements, warehouseStocks } from '../src/db/schema';
 import { computeTransaction, commitCheckout, type CheckoutInput } from '../src/services/checkout.service';
+import { getDefaultWarehouseId } from '../src/lib/stock';
 import { isAppError } from '../src/lib/errors';
 import type { AuthUser } from '../src/middleware/auth';
 
@@ -70,6 +71,14 @@ beforeAll(async () => {
     .values({ categoryId: catId, name: 'Test Jasa', sku: `TJ-${Date.now()}`, unit: 'unit', costPrice: 0, sellingPrice: 15000, stockOnHand: 0, trackStock: false, minStock: 0, isTaxable: false })
     .returning();
   jasaProductId = jp.id;
+
+  // Fase 3 (SPEC §5.1): stok operasional = stok GUDANG DEFAULT — test membuat
+  // baris warehouse_stocks agar invariant Σ gudang = stock_on_hand utuh.
+  const defaultWhId = await getDefaultWarehouseId(db);
+  await db.insert(warehouseStocks).values([
+    { warehouseId: defaultWhId, productId: bp.id, productVariantId: null, quantity: 100, minStock: 0 },
+    { warehouseId: defaultWhId, productId: vp.id, productVariantId: va.id, quantity: 30, minStock: 0 },
+  ]);
 });
 
 afterAll(async () => {
@@ -207,8 +216,16 @@ describe('commitCheckout: snapshot satuan/varian (AC-03.4)', () => {
     // stok berkurang tepat 80 (100 → 20, AC-03.3)
     const [p] = await db.select({ stockOnHand: products.stockOnHand }).from(products).where(eq(products.id, baseProductId));
     expect(Number(p!.stockOnHand)).toBe(20);
+    // invariant F3: stok gudang default juga 20
+    const defaultWhId = await getDefaultWarehouseId(db);
+    const [ws] = await db
+      .select({ quantity: warehouseStocks.quantity })
+      .from(warehouseStocks)
+      .where(and(eq(warehouseStocks.warehouseId, defaultWhId), eq(warehouseStocks.productId, baseProductId), isNull(warehouseStocks.productVariantId)));
+    expect(Number(ws!.quantity)).toBe(20);
     // cleanup transaksi test
     await db.delete(transactions).where(eq(transactions.id, res.transaction.id));
     await db.update(products).set({ stockOnHand: 100 }).where(eq(products.id, baseProductId));
+    await db.update(warehouseStocks).set({ quantity: 100 }).where(eq(warehouseStocks.id, ws!.id));
   }, 30_000);
 });

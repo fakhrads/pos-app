@@ -6,7 +6,7 @@
  */
 import { desc, like } from 'drizzle-orm';
 import type { DbOrTx } from '../db';
-import { transactions, returns, memberships } from '../db/schema';
+import { transactions, returns, memberships, stockTransfers } from '../db/schema';
 
 const WIB_OFFSET_MS = 7 * 3600 * 1000;
 
@@ -51,4 +51,22 @@ export async function nextMemberCode(dbOrTx: DbOrTx): Promise<string> {
   const last = rows[0]?.memberCode;
   const seq = last ? Number.parseInt(last.replace(/^MBR-/, ''), 10) + 1 : 1;
   return `MBR-${String(seq).padStart(5, '0')}`;
+}
+
+/**
+ * Fase 3 (SPEC §5.9): nomor dokumen transfer stok — TRF-YYYYMMDD-XXXX,
+ * sekuensial per hari (pola TRX/RET). Satu nomor = satu dokumen multi-item.
+ * Unique index uq_stock_transfers_number = jaring pengaman; caller retry 1× (23505).
+ */
+export async function nextTransferNumber(dbOrTx: DbOrTx, date: Date = new Date()): Promise<string> {
+  const prefix = `TRF-${yyyymmddWib(date)}`;
+  const rows = await dbOrTx
+    .select({ transferNumber: stockTransfers.transferNumber })
+    .from(stockTransfers)
+    .where(like(stockTransfers.transferNumber, `${prefix}-%`))
+    .orderBy(desc(stockTransfers.transferNumber))
+    .limit(1);
+  const last = rows[0]?.transferNumber;
+  const seq = last ? Number.parseInt(last.split('-').pop() ?? '0', 10) + 1 : 1;
+  return `${prefix}-${String(seq).padStart(4, '0')}`;
 }

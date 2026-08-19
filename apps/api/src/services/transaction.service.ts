@@ -9,6 +9,7 @@ import { transactions, transactionItems, payments, products, productVariants, st
 import { fail } from '../lib/errors';
 import { toQty } from '../lib/money';
 import { writeAudit } from '../lib/audit';
+import { getDefaultWarehouseId, applyWarehouseDelta } from '../lib/stock';
 import type { AuthUser } from '../middleware/auth';
 import type { PaymentInput } from './checkout.service';
 
@@ -35,6 +36,8 @@ export async function cancelTransaction(
     // Restock sisa (qty − returned) per item — dalam UNIT DASAR (SPEC §8.1):
     // quantity item = satuan penjualan → stok kembali = qty × unit_factor.
     // Item ber-varian → stok balik ke product_variants.
+    // Fase 3 (SPEC §5.1): cancellation balik ke GUDANG DEFAULT + warehouse_id.
+    const defaultWhId = await getDefaultWarehouseId(tx);
     const items = await tx.select().from(transactionItems).where(eq(transactionItems.transactionId, trx.id));
     for (const it of items) {
       const remainingSale = toQty(Number(it.quantity) - Number(it.returnedQuantity));
@@ -48,13 +51,15 @@ export async function cancelTransaction(
         const before = Number(v.stockOnHand);
         const after = toQty(before + remaining);
         await tx.update(productVariants).set({ stockOnHand: after }).where(eq(productVariants.id, v.id));
+        const wh = await applyWarehouseDelta(tx, defaultWhId, it.productId, v.id, remaining);
         await tx.insert(stockMovements).values({
+          warehouseId: defaultWhId,
           productId: it.productId,
           productVariantId: v.id,
           type: 'cancellation',
           quantity: remaining,
-          beforeQty: before,
-          afterQty: after,
+          beforeQty: wh.before,
+          afterQty: wh.after,
           transactionId: trx.id,
           note: `Void ${trx.invoiceNumber}: ${reason}`,
           createdBy: user.id,
@@ -65,12 +70,14 @@ export async function cancelTransaction(
         const before = Number(p.stockOnHand);
         const after = toQty(before + remaining);
         await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, p.id));
+        const wh = await applyWarehouseDelta(tx, defaultWhId, p.id, null, remaining);
         await tx.insert(stockMovements).values({
+          warehouseId: defaultWhId,
           productId: p.id,
           type: 'cancellation',
           quantity: remaining,
-          beforeQty: before,
-          afterQty: after,
+          beforeQty: wh.before,
+          afterQty: wh.after,
           transactionId: trx.id,
           note: `Void ${trx.invoiceNumber}: ${reason}`,
           createdBy: user.id,

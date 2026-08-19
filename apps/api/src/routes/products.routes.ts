@@ -19,7 +19,7 @@
 import { Elysia, t } from 'elysia';
 import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db, type Tx } from '../db';
-import { products, categories, stockMovements, productVariants, productUnits, warehouseStocks, warehouses, type Product } from '../db/schema';
+import { products, categories, stockMovements, productVariants, productUnits, type Product } from '../db/schema';
 import { ok, clientIp, parsePagination, paginationMeta, parseSort } from '../lib/http';
 import { fail } from '../lib/errors';
 import { toQty } from '../lib/money';
@@ -48,6 +48,7 @@ import {
   type RowError,
 } from '../lib/import-export';
 import { mustAuth, mustManager, mustAdmin, getUser, type RouteCtx, type AuthUser } from '../middleware/auth';
+import { getDefaultWarehouseId, applyWarehouseDelta } from '../lib/stock';
 
 /* ---------------- helpers ---------------- */
 
@@ -135,63 +136,6 @@ async function barcodeCollides(tx: Tx | typeof db, barcode: string, excludeProdu
     .where(and(eq(productVariants.barcode, barcode), isNull(productVariants.deletedAt)))
     .limit(1);
   return v.length > 0;
-}
-
-/**
- * Jaga invariant (SPEC §3.7, AC-07.3): Σ warehouse_stocks = products.stock_on_hand.
- * Delta positif → tambah ke baris stok gudang (prioritas qty terbesar);
- * delta negatif → kurangi dari baris-baris tersebut (tidak boleh negatif).
- * Produk tanpa baris warehouse_stocks (produk baru/import) → dibuatkan baris di
- * gudang default GUD-PUSAT agar invariant tetap terjaga.
- * DIPANGGIL DALAM TRANSAKSI yang sama dengan update products → atomic (bug QA-2).
- */
-async function syncWarehouseStocks(tx: Tx, productId: string, delta: number, after: number, minStock: number): Promise<void> {
-  if (delta === 0) return;
-  const rows = await tx
-    .select({ id: warehouseStocks.id, quantity: warehouseStocks.quantity })
-    .from(warehouseStocks)
-    .where(and(eq(warehouseStocks.productId, productId), isNull(warehouseStocks.productVariantId)))
-    .orderBy(desc(warehouseStocks.quantity));
-
-  if (rows.length === 0) {
-    // Produk belum punya representasi stok gudang → buat baris di gudang default
-    const [wh] = await tx
-      .select({ id: warehouses.id })
-      .from(warehouses)
-      .where(and(eq(warehouses.code, 'GUD-PUSAT'), isNull(warehouses.deletedAt)))
-      .limit(1);
-    if (wh) {
-      await tx
-        .insert(warehouseStocks)
-        .values({
-          warehouseId: wh.id,
-          productId,
-          productVariantId: null,
-          quantity: toQty(after),
-          minStock: toQty(minStock),
-          updatedAt: new Date(),
-        })
-        .onConflictDoNothing();
-    }
-    return;
-  }
-
-  let remaining = delta;
-  const now = new Date();
-  for (const w of rows) {
-    if (remaining === 0) break;
-    const qty = Number(w.quantity);
-    if (remaining > 0) {
-      await tx.update(warehouseStocks).set({ quantity: toQty(qty + remaining), updatedAt: now }).where(eq(warehouseStocks.id, w.id));
-      remaining = 0;
-    } else {
-      const take = Math.min(qty, Math.abs(remaining));
-      await tx.update(warehouseStocks).set({ quantity: toQty(qty - take), updatedAt: now }).where(eq(warehouseStocks.id, w.id));
-      remaining += take;
-    }
-  }
-  // Sisa negative (hanya mungkin bila invariant DB sudah rusak) dibiarkan —
-  // CHECK quantity >= 0 mencegah baris negatif.
 }
 
 const variantInputSchema = t.Object({
@@ -629,15 +573,20 @@ const writeRoutes = new Elysia()
             requested: Math.abs(delta),
           });
         }
+        // Fase 3 (SPEC §5.2): endpoint ini = shortcut GUDANG DEFAULT — delta
+        // diterapkan ke warehouse_stocks gudang default (ATOMIK, 409 bila
+        // stok gudang < |delta|) + warehouse_id di movement. Invariant
+        // Σ gudang = stock_on_hand utuh: produk & gudang berkurang sama besar.
+        const defaultWhId = await getDefaultWarehouseId(tx);
+        const wh = await applyWarehouseDelta(tx, defaultWhId, product.id, null, delta);
         await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, product.id));
-        // Bug QA-2: update products + warehouse_stocks ATOMIC (invariant Σ gudang = stock_on_hand)
-        await syncWarehouseStocks(tx, product.id, delta, after, Number(locked.minStock ?? 0));
         await tx.insert(stockMovements).values({
+          warehouseId: defaultWhId,
           productId: product.id,
           type,
           quantity: Math.abs(delta),
-          beforeQty: before,
-          afterQty: after,
+          beforeQty: wh.before,
+          afterQty: wh.after,
           reference: ctx.body.reference ?? null,
           note: reason,
           createdBy: user.id,

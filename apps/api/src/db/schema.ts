@@ -36,7 +36,7 @@ import { sql } from 'drizzle-orm';
 /* ------------------------------------------------------------------ */
 export const userRole = pgEnum('user_role', ['admin', 'manager', 'kasir']);
 export const membershipTier = pgEnum('membership_tier', ['bronze', 'silver', 'gold']);
-export const movementType = pgEnum('movement_type', ['initial', 'purchase_in', 'sale_out', 'return_in', 'adjustment', 'cancellation']);
+export const movementType = pgEnum('movement_type', ['initial', 'purchase_in', 'sale_out', 'return_in', 'adjustment', 'cancellation', 'transfer_out', 'transfer_in']);
 export const transactionStatus = pgEnum('transaction_status', ['pending', 'completed', 'cancelled']);
 export const paymentStatus = pgEnum('payment_status', ['unpaid', 'partial', 'paid', 'refunded', 'failed']);
 export const paymentMethod = pgEnum('payment_method', ['cash', 'qris', 'transfer']);
@@ -403,6 +403,9 @@ export const stockMovements = pgTable(
   'stock_movements',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Fase 3 (SPEC §3.1) — gudang asal mutasi; wajib terisi untuk SEMUA mutasi
+    // (kartu stok per gudang F3-5). NULL hanya baris legacy yang gagal backfill.
+    warehouseId: uuid('warehouse_id').references(() => warehouses.id, { onDelete: 'set null' }),
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id),
@@ -423,6 +426,8 @@ export const stockMovements = pgTable(
     index('idx_stock_movements_product').on(t.productId, t.createdAt),
     index('idx_stock_movements_tx').on(t.transactionId),
     index('idx_stock_movements_return').on(t.returnId),
+    // Fase 3 (SPEC §3.1): akses kartu stok per gudang per produk
+    index('idx_stock_movements_wh_product').on(t.warehouseId, t.productId, t.createdAt),
   ],
 );
 
@@ -610,6 +615,8 @@ export const stockTransfers = pgTable(
   'stock_transfers',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Fase 3 (SPEC §3.2): satu nomor = satu dokumen transfer multi-item
+    transferNumber: varchar('transfer_number', { length: 30 }).notNull(),
     fromWarehouseId: uuid('from_warehouse_id')
       .notNull()
       .references(() => warehouses.id),
@@ -628,6 +635,9 @@ export const stockTransfers = pgTable(
   (t) => [
     index('idx_stock_transfers_from').on(t.fromWarehouseId),
     index('idx_stock_transfers_to').on(t.toWarehouseId),
+    // Fase 3 (SPEC §3.2): pengelompokan riwayat per nomor dokumen
+    uniqueIndex('uq_stock_transfers_number').on(t.transferNumber),
+    index('idx_stock_transfers_number_created').on(t.transferNumber, t.createdAt),
     check('ck_transfers_qty', sql`${t.quantity} > 0`),
     check('ck_transfers_diff', sql`${t.fromWarehouseId} <> ${t.toWarehouseId}`),
   ],
@@ -685,4 +695,6 @@ export type NewWarehouse = typeof warehouses.$inferInsert;
 export type WarehouseStock = typeof warehouseStocks.$inferSelect;
 export type NewWarehouseStock = typeof warehouseStocks.$inferInsert;
 export type StockTransfer = typeof stockTransfers.$inferSelect;
+export type NewStockTransfer = typeof stockTransfers.$inferInsert;
 export type StockAdjustment = typeof stockAdjustments.$inferSelect;
+export type NewStockAdjustment = typeof stockAdjustments.$inferInsert;

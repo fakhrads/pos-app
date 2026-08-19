@@ -19,6 +19,7 @@ import { env } from '../env';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DDL_PATH = path.join(__dirname, 'ddl.sql');
 const DDL_PHASE2_PATH = path.join(__dirname, 'ddl-phase2.sql');
+const DDL_PHASE3_PATH = path.join(__dirname, 'ddl-phase3.sql');
 
 async function main(): Promise<void> {
   console.log('[migrate] target:', env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
@@ -31,6 +32,13 @@ async function main(): Promise<void> {
   // Fase 2 (SPEC §8.2.2): DDL idempotent — tabel baru + alter kolom
   await client.unsafe(readFileSync(DDL_PHASE2_PATH, 'utf-8'));
   console.log('[migrate] DDL Fase 2 selesai (6 tabel baru, 8 kolom baru, idempotent).');
+
+  // Fase 3 (SPEC §8.2.1): DDL idempotent — 2 ALTER kecil + enum + settings key.
+  // Catatan: nilai enum baru (transfer_out/in) TIDAK dipakai dalam transaksi
+  // migrasi ini (backfill hanya warehouse_id & transfer_number), jadi aman
+  // dieksekusi dalam satu unsafe() (simple query protocol = 1 transaksi).
+  await client.unsafe(readFileSync(DDL_PHASE3_PATH, 'utf-8'));
+  console.log('[migrate] DDL Fase 3 selesai (enum +2 nilai, +2 kolom, +index, settings default warehouse).');
 
   // ---------- Seed admin awal ----------
   if (!env.SEED_ADMIN_EMAIL || !env.SEED_ADMIN_PASSWORD) {

@@ -25,6 +25,7 @@ import { toQty, roundMoney } from '../lib/money';
 import { getSettings, numSetting } from '../lib/settings';
 import { nextReturnNumber } from '../lib/sequence';
 import { writeAudit } from '../lib/audit';
+import { getDefaultWarehouseId, applyWarehouseDelta } from '../lib/stock';
 import type { AuthUser } from '../middleware/auth';
 
 export interface ReturnItemInput {
@@ -133,6 +134,8 @@ export async function createReturn(
     /* ---------- 6. Restock (return_in) + refund payment / kredit poin ---------- */
     // Stok kembali dalam UNIT DASAR: qty return (satuan penjualan) × unit_factor.
     // Item ber-varian → stok balik ke product_variants (SPEC §8.1).
+    // Fase 3 (SPEC §5.1): return_in balik ke GUDANG DEFAULT + warehouse_id terisi.
+    const defaultWhId = await getDefaultWarehouseId(tx);
     for (const p of processed) {
       if (!p.item.productId) continue;
       const factor = Number(p.item.unitFactor ?? 1);
@@ -143,13 +146,15 @@ export async function createReturn(
         const before = Number(v.stockOnHand);
         const after = toQty(before + qtyBase);
         await tx.update(productVariants).set({ stockOnHand: after }).where(eq(productVariants.id, v.id));
+        const wh = await applyWarehouseDelta(tx, defaultWhId, p.item.productId, v.id, qtyBase);
         await tx.insert(stockMovements).values({
+          warehouseId: defaultWhId,
           productId: p.item.productId,
           productVariantId: v.id,
           type: 'return_in',
           quantity: qtyBase,
-          beforeQty: before,
-          afterQty: after,
+          beforeQty: wh.before,
+          afterQty: wh.after,
           transactionId: trx.id,
           returnId: ret.id,
           note: `Return ${returnNumber}: ${p.reason}`,
@@ -161,12 +166,14 @@ export async function createReturn(
         const before = Number(prod.stockOnHand);
         const after = toQty(before + qtyBase);
         await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, prod.id));
+        const wh = await applyWarehouseDelta(tx, defaultWhId, prod.id, null, qtyBase);
         await tx.insert(stockMovements).values({
+          warehouseId: defaultWhId,
           productId: prod.id,
           type: 'return_in',
           quantity: qtyBase,
-          beforeQty: before,
-          afterQty: after,
+          beforeQty: wh.before,
+          afterQty: wh.after,
           transactionId: trx.id,
           returnId: ret.id,
           note: `Return ${returnNumber}: ${p.reason}`,

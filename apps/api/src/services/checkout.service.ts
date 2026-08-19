@@ -23,6 +23,7 @@ import {
   transactionItems,
   payments,
   stockMovements,
+  warehouseStocks,
   pointMovements,
   discounts,
   taxRates,
@@ -39,6 +40,7 @@ import { writeAudit } from '../lib/audit';
 import { reserveIdempotency, completeIdempotency, clearIdempotency } from '../lib/idempotency';
 import { nextInvoiceNumber } from '../lib/sequence';
 import { buildReceipt, loadTransactionDetail } from './receipt';
+import { getDefaultWarehouseId, applyWarehouseDelta } from '../lib/stock';
 import type { AuthUser } from '../middleware/auth';
 
 /* ------------------------------------------------------------------ */
@@ -186,6 +188,23 @@ export async function computeTransaction(
   const unitMap = new Map<string, (typeof productUnits.$inferSelect)>();
   for (const u of unitRows) unitMap.set(`${u.productId}:${u.unit.toLowerCase()}`, u);
 
+  // Fase 3 (SPEC §5.1): stok operasional = stok gudang DEFAULT (bukan total
+  // semua gudang). Cek stok & before/after memakai warehouse_stocks gudang
+  // default; baris tidak ada = stok 0 (invariant §3.4.1: baris dibuat saat
+  // stok pertama masuk). Lock FOR UPDATE saat commit (anti oversell R13).
+  const defaultWhId = await getDefaultWarehouseId(dbOrTx);
+  let whStockRows: (typeof warehouseStocks.$inferSelect)[] = [];
+  if (ids.length > 0) {
+    const whBase = dbOrTx
+      .select()
+      .from(warehouseStocks)
+      .where(and(eq(warehouseStocks.warehouseId, defaultWhId), inArray(warehouseStocks.productId, ids)));
+    const whQuery = opts.forUpdate ? (whBase.for('update') as typeof whBase) : whBase;
+    whStockRows = await whQuery;
+  }
+  const whStockMap = new Map<string, number>();
+  for (const r of whStockRows) whStockMap.set(`${r.productId}:${r.productVariantId ?? ''}`, Number(r.quantity));
+
   const s = await getSettings();
   const maxManualPct = numSetting(s, 'discount.manual_max_percent', 20);
   const maxManualAmt = numSetting(s, 'discount.manual_max_amount', 50000);
@@ -200,6 +219,7 @@ export async function computeTransaction(
     requested: number; // unit dasar
     availableInUnit: number; // floor, satuan pilihan
     requestedInUnit: number; // qty satuan pilihan
+    warehouseId: string; // F3: gudang default (SPEC §4.7)
   }[] = [];
 
   for (let itemIdx = 0; itemIdx < input.items.length; itemIdx++) {
@@ -217,12 +237,12 @@ export async function computeTransaction(
       variant = variantMap.get(item.variantId) ?? null;
       if (!variant || variant.productId !== p.id) fail('VARIANT_NOT_FOUND', 'Varian tidak ditemukan untuk produk ini', 422, { field: `items[${itemIdx}].variantId` });
       if (!variant.isActive) fail('VALIDATION_ERROR', `Varian '${variant.name}' sedang nonaktif`, 422);
-      stockBase = Number(variant.stockOnHand);
+      stockBase = whStockMap.get(`${p.id}:${variant.id}`) ?? 0; // F3: stok gudang default
     } else {
       if (p.hasVariants) {
         fail('VALIDATION_ERROR', `Produk '${p.name}' ber-varian — wajib pilih varian`, 422, { field: `items[${itemIdx}].variantId` });
       }
-      stockBase = Number(p.stockOnHand);
+      stockBase = whStockMap.get(`${p.id}:`) ?? 0; // F3: stok gudang default
     }
 
     // 2) Resolusi satuan (SPEC §4.4.2)
@@ -254,6 +274,7 @@ export async function computeTransaction(
         requested: qtyStock,
         availableInUnit: Math.floor(stockBase / unitFactor),
         requestedInUnit: qty,
+        warehouseId: defaultWhId, // F3 (SPEC §4.7): details menyertakan gudang
       });
     }
 
@@ -604,20 +625,25 @@ export async function commitCheckout(
 
           // Stock: update denormalisasi + ledger, dalam transaksi yang sama.
           // Varian → product_variants; non-varian → products (stok sudah di-lock
-          // & divalidasi di computeTransaction).
+          // & divalidasi di computeTransaction terhadap GUDANG DEFAULT — F3 §5.1).
+          const defaultWhId = await getDefaultWarehouseId(tx);
           for (const sm of computed.stockMovements) {
+            // stok_on_hand produk/varian (level produk — invariant Σ gudang)
             if (sm.productVariantId) {
               await tx.update(productVariants).set({ stockOnHand: sm.afterQty }).where(eq(productVariants.id, sm.productVariantId));
             } else {
               await tx.update(products).set({ stockOnHand: sm.afterQty }).where(eq(products.id, sm.productId));
             }
+            // stok gudang default ATOMIK + ledger level gudang (kartu stok AC-05.2)
+            const wh = await applyWarehouseDelta(tx, defaultWhId, sm.productId, sm.productVariantId, -sm.quantity);
             await tx.insert(stockMovements).values({
+              warehouseId: defaultWhId,
               productId: sm.productId,
               productVariantId: sm.productVariantId,
               type: sm.type,
               quantity: sm.quantity,
-              beforeQty: sm.beforeQty,
-              afterQty: sm.afterQty,
+              beforeQty: wh.before,
+              afterQty: wh.after,
               transactionId: trx.id,
               createdBy: user.id,
             });
