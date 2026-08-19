@@ -323,6 +323,8 @@ export interface CartItem {
   unit: string;
   /** Snapshot faktor konversi saat item masuk cart (unit dasar = 1) */
   unitFactor?: number;
+  /** Label konversi untuk tampilan, mis. "12 pcs" (unit dasar) — Fase 4 */
+  unitBaseLabel?: string;
   unitPrice: number;
   quantity: number;
   stockOnHand: number;
@@ -528,7 +530,15 @@ export interface Settings {
   "discount.manual_max_amount"?: number;
   "return.max_days"?: number;
   "report.timezone"?: string;
-  [key: string]: string | number | undefined;
+  // ---------- Fase 4 (SPEC §3.4): shift, hold, struk, WhatsApp ----------
+  "shift.enforce_checkout"?: boolean;
+  "shift.cash_tolerance"?: number;
+  "store.whatsapp_number"?: string;
+  "receipt.print_width_mm"?: number;
+  "receipt.show_verification_qr"?: boolean;
+  "receipt.show_qris_qr"?: boolean;
+  "pos.hold_per_day_limit"?: number;
+  [key: string]: string | number | boolean | undefined;
 }
 
 export interface SettingsResponse {
@@ -560,4 +570,100 @@ export interface ReturnRecord {
   reason?: string | null;
   notes?: string | null;
   returnedAt: string;
+}
+
+// ============================================================
+// Fase 4 — Kasir: Shift & Held Cart (SPEC §3.2, §3.3, §4.1, §4.2)
+// ============================================================
+
+export type ShiftStatus = "open" | "closed";
+
+export interface Shift {
+  id: string;
+  shiftNumber: string;
+  outletId?: number;
+  userId: string;
+  userName?: string | null;
+  status: ShiftStatus;
+  openedAt: string;
+  closedAt?: string | null;
+  openingCash: number;
+  cashSales: number;
+  qrisSales: number;
+  transferSales: number;
+  refunds: number;
+  expectedCash: number;
+  actualCash?: number | null;
+  discrepancy: number;
+  transactionCount: number;
+  returnCount?: number;
+  notes?: string | null;
+}
+
+/** Snapshot statistik shift (SPEC §5.5) — dikirim pada close & detail */
+export interface ShiftSummary {
+  openingCash: number;
+  cashSales: number;
+  qrisSales: number;
+  transferSales: number;
+  refunds: number;
+  cashRefunds: number;
+  expectedCash: number;
+  actualCash?: number | null;
+  discrepancy: number;
+  transactionCount: number;
+  returnCount: number;
+}
+
+export interface ShiftDetailResult {
+  shift: Shift;
+  summary: ShiftSummary;
+  transactions: {
+    id: string;
+    invoiceNumber: string;
+    total: number;
+    paymentStatus: string;
+    soldAt: string;
+  }[];
+  returns: {
+    id: string;
+    returnNumber: string;
+    totalRefund: number;
+    returnedAt: string;
+  }[];
+}
+
+/** Item hold — bentuk persis items body checkout, TANPA harga (SPEC §1.3.6) */
+export interface HeldCartItem {
+  productId: string;
+  variantId?: string | null;
+  unit?: string;
+  quantity: number;
+  discount?: CartDiscount | null;
+}
+
+export type HeldCartStatus = "held" | "resumed" | "discarded";
+
+export interface HeldCart {
+  id: string;
+  holdNumber: string;
+  label?: string | null;
+  customerId?: string | null;
+  items: HeldCartItem[];
+  status: HeldCartStatus;
+  expiresAt: string;
+  remainingMinutes?: number | null;
+  createdAt?: string;
+}
+
+export interface HeldCartCreatePayload {
+  label?: string;
+  customerId?: string;
+  items: HeldCartItem[];
+}
+
+/** Item baris list hold (GET /held-carts) */
+export interface HeldCartListItem extends HeldCart {
+  itemCount: number;
+  totalQuantity: number;
 }

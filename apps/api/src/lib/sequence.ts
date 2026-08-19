@@ -6,7 +6,7 @@
  */
 import { desc, like } from 'drizzle-orm';
 import type { DbOrTx } from '../db';
-import { transactions, returns, memberships, stockTransfers } from '../db/schema';
+import { transactions, returns, memberships, stockTransfers, shifts, heldCarts } from '../db/schema';
 
 const WIB_OFFSET_MS = 7 * 3600 * 1000;
 
@@ -67,6 +67,42 @@ export async function nextTransferNumber(dbOrTx: DbOrTx, date: Date = new Date()
     .orderBy(desc(stockTransfers.transferNumber))
     .limit(1);
   const last = rows[0]?.transferNumber;
+  const seq = last ? Number.parseInt(last.split('-').pop() ?? '0', 10) + 1 : 1;
+  return `${prefix}-${String(seq).padStart(4, '0')}`;
+}
+
+/**
+ * Fase 4 (SPEC §3.2): nomor shift — SHF-YYYYMMDD-XXXX, sekuensial per hari
+ * (pola TRX/RET). Unique constraint uq_shifts_number = jaring pengaman;
+ * caller retry 1× saat konflik (23505).
+ */
+export async function nextShiftNumber(dbOrTx: DbOrTx, date: Date = new Date()): Promise<string> {
+  const prefix = `SHF-${yyyymmddWib(date)}`;
+  const rows = await dbOrTx
+    .select({ shiftNumber: shifts.shiftNumber })
+    .from(shifts)
+    .where(like(shifts.shiftNumber, `${prefix}-%`))
+    .orderBy(desc(shifts.shiftNumber))
+    .limit(1);
+  const last = rows[0]?.shiftNumber;
+  const seq = last ? Number.parseInt(last.split('-').pop() ?? '0', 10) + 1 : 1;
+  return `${prefix}-${String(seq).padStart(4, '0')}`;
+}
+
+/**
+ * Fase 4 (SPEC §3.3): nomor hold — HOLD-YYYYMMDD-XXXX, sekuensial per hari
+ * (pola TRX/RET). Unique constraint uq_held_carts_number = jaring pengaman;
+ * caller retry 1× saat konflik (23505).
+ */
+export async function nextHoldNumber(dbOrTx: DbOrTx, date: Date = new Date()): Promise<string> {
+  const prefix = `HOLD-${yyyymmddWib(date)}`;
+  const rows = await dbOrTx
+    .select({ holdNumber: heldCarts.holdNumber })
+    .from(heldCarts)
+    .where(like(heldCarts.holdNumber, `${prefix}-%`))
+    .orderBy(desc(heldCarts.holdNumber))
+    .limit(1);
+  const last = rows[0]?.holdNumber;
   const seq = last ? Number.parseInt(last.split('-').pop() ?? '0', 10) + 1 : 1;
   return `${prefix}-${String(seq).padStart(4, '0')}`;
 }

@@ -11,6 +11,7 @@ import { returns } from '../db/schema';
 import { ok, clientIp, parsePagination, paginationMeta } from '../lib/http';
 import { fail } from '../lib/errors';
 import { createReturn, loadReturnDetail } from '../services/return.service';
+import { enforceShift } from '../lib/shift';
 import { mustAuth, getUser, type RouteCtx } from '../middleware/auth';
 
 const returnRoutes = new Elysia()
@@ -19,6 +20,9 @@ const returnRoutes = new Elysia()
     '/returns',
     async (ctx: RouteCtx) => {
       const user = getUser(ctx);
+      // Fase 4 (SPEC §4.3, AC-07.8): guard wajib shift terbuka — route-level,
+      // service return (createReturn) TIDAK disentuh.
+      await enforceShift(undefined, user);
       const result = await createReturn(
         {
           transactionId: String(ctx.body.transactionId),

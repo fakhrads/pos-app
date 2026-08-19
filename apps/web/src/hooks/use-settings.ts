@@ -16,6 +16,14 @@ const DEFAULTS: Settings = {
   "discount.manual_max_amount": 50000,
   "return.max_days": 7,
   "report.timezone": "Asia/Jakarta",
+  // Fase 4 (SPEC §3.4)
+  "shift.enforce_checkout": true,
+  "shift.cash_tolerance": 0,
+  "store.whatsapp_number": "",
+  "receipt.print_width_mm": 80,
+  "receipt.show_verification_qr": false,
+  "receipt.show_qris_qr": false,
+  "pos.hold_per_day_limit": 20,
 };
 
 export function useSettings() {
@@ -40,18 +48,27 @@ export function useSettings() {
   return { settings, loading, reload };
 }
 
-/** Akses aman nilai setting dengan default */
-export function useSetting<T extends string | number>(
+/** Akses aman nilai setting dengan default (string | number | boolean) */
+export function useSetting<T extends string | number | boolean>(
   settings: Settings | null,
   key: string,
   fallback: T
 ): T {
   const raw = settings?.[key];
   if (raw === undefined) return fallback;
+  if (typeof raw === "boolean") return raw as T;
   if (typeof raw === "number") return raw as T;
-  if (typeof raw === "string" && typeof fallback === "number") {
-    const n = Number(raw);
-    return (Number.isNaN(n) ? fallback : n) as T;
+  if (typeof raw === "string") {
+    if (typeof fallback === "number") {
+      const n = Number(raw);
+      return (Number.isNaN(n) ? fallback : n) as T;
+    }
+    if (typeof fallback === "boolean") {
+      if (raw === "true" || raw === "1") return true as T;
+      if (raw === "false" || raw === "0") return false as T;
+      return fallback;
+    }
+    return raw as T;
   }
   return raw as T;
 }

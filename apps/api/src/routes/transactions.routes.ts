@@ -19,6 +19,7 @@ import { getSettings, strSetting } from '../lib/settings';
 import { computeTransaction, commitCheckout, type CheckoutInput } from '../services/checkout.service';
 import { cancelTransaction, addAdditionalPayment } from '../services/transaction.service';
 import { loadTransactionDetail, buildReceipt, receiptText } from '../services/receipt';
+import { enforceShift } from '../lib/shift';
 import { mustAuth, mustManager, getUser, type RouteCtx } from '../middleware/auth';
 
 /* ---------------- schema body checkout ---------------- */
@@ -99,6 +100,11 @@ const posRoutes = new Elysia()
       }
       const idemKey = String(ctx.headers['idempotency-key'] ?? '').trim();
       if (!idemKey) fail('INVALID_PARAM', 'Header Idempotency-Key wajib untuk checkout', 400);
+
+      // Fase 4 (SPEC §4.4, AC-06.3): guard wajib shift terbuka — ADDITIVE, dievaluasi
+      // SEBELUM idempotency reserve (409 lebih dulu daripada replay, SPEC §9.4).
+      // Service checkout TIDAK disentuh.
+      await enforceShift(undefined, user);
 
       const result = await commitCheckout(
         ctx.body as CheckoutInput,

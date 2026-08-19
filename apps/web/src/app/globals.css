@@ -200,7 +200,9 @@
 }
 
 /* ============================================================
-   Struk thermal 58mm — print hanya area struk
+   Struk thermal (58mm / 80mm) — print hanya area struk.
+   Lebar konten via CSS var --print-width (di-set inline oleh
+   ReceiptView sesuai setting receipt.print_width_mm).
    ============================================================ */
 @media print {
   body * {
@@ -214,7 +216,7 @@
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 58mm !important;
+    width: var(--print-width, 58mm) !important;
     max-height: none !important;
     overflow: visible !important;
     box-shadow: none !important;

@@ -30,3 +30,16 @@ export function strSetting(s: Record<string, unknown>, key: string, def: string)
   const v = s[key];
   return typeof v === 'string' && v !== '' ? v : def;
 }
+
+/** Boolean setting dengan default (Fase 4: shift.enforce_checkout, receipt.show_*. */
+export function boolSetting(s: Record<string, unknown>, key: string, def: boolean): boolean {
+  const v = s[key];
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'string') {
+    if (v === 'true' || v === '1') return true;
+    if (v === 'false' || v === '0') return false;
+    return def;
+  }
+  if (typeof v === 'number') return v === 1;
+  return def;
+}

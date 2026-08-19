@@ -46,6 +46,8 @@ export const discountScope = pgEnum('discount_scope', ['global', 'category', 'pr
 export const refundMethod = pgEnum('refund_method', ['cash', 'qris', 'transfer', 'points']);
 export const returnStatus = pgEnum('return_status', ['completed', 'cancelled']);
 export const pointMovementType = pgEnum('point_movement_type', ['earned', 'redeemed', 'adjustment']);
+// Fase 4 (SPEC §3.1) — status shift: open = aktif, closed = snapshot tersimpan
+export const shiftStatus = pgEnum('shift_status', ['open', 'closed']);
 
 /** INET PostgreSQL — dipetakan sebagai string (postgres.js mengembalikan teks). */
 const inet = customType<{ data: string; driverData: string }>({
@@ -669,6 +671,82 @@ export const stockAdjustments = pgTable(
   ],
 );
 
+/* ------------------------------------------------------------------ */
+/* 24. SHIFTS — Fase 4 (SPEC §3.2, F4-6)                               */
+/*     Atribusi transaksi/retur ke shift via WINDOW WAKTU              */
+/*     [opened_at, closed_at) — bukan FK shift_id (§1.3.3).            */
+/*     Statistik di-snapshot saat close; 1 user ≤ 1 shift open.        */
+/* ------------------------------------------------------------------ */
+export const shifts = pgTable(
+  'shifts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shiftNumber: varchar('shift_number', { length: 30 }).notNull().unique(),
+    outletId: bigint('outlet_id', { mode: 'number' }).notNull().default(1),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    status: shiftStatus('status').notNull().default('open'),
+    openedAt: timestamp('opened_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    closedAt: timestamp('closed_at', { withTimezone: true, mode: 'date' }),
+    openingCash: bigint('opening_cash', { mode: 'number' }).notNull().default(0),
+    cashSales: bigint('cash_sales', { mode: 'number' }).notNull().default(0),
+    qrisSales: bigint('qris_sales', { mode: 'number' }).notNull().default(0),
+    transferSales: bigint('transfer_sales', { mode: 'number' }).notNull().default(0),
+    refunds: bigint('refunds', { mode: 'number' }).notNull().default(0),
+    expectedCash: bigint('expected_cash', { mode: 'number' }).notNull().default(0),
+    actualCash: bigint('actual_cash', { mode: 'number' }),
+    discrepancy: bigint('discrepancy', { mode: 'number' }).notNull().default(0),
+    transactionCount: integer('transaction_count').notNull().default(0),
+    returnCount: integer('return_count').notNull().default(0),
+    notes: text('notes'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_shifts_user_status').on(t.userId, t.status),
+    index('idx_shifts_opened_at').on(t.openedAt),
+    index('idx_shifts_status').on(t.status),
+    check('ck_shifts_opening_cash', sql`${t.openingCash} >= 0`),
+    check('ck_shifts_cash_sales', sql`${t.cashSales} >= 0`),
+    check('ck_shifts_qris_sales', sql`${t.qrisSales} >= 0`),
+    check('ck_shifts_transfer_sales', sql`${t.transferSales} >= 0`),
+    check('ck_shifts_refunds', sql`${t.refunds} >= 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 25. HELD_CARTS — Fase 4 (SPEC §3.3, F4-4)                           */
+/*     Snapshot JSONB tanpa harga (§1.3.6 — harga TIDAK dipercaya).    */
+/*     Status VARCHAR (bukan enum) — terminal & bebas migrasi.         */
+/*     Kadaluarsa akhir hari WIB; lazy filter tanpa job cleanup.       */
+/* ------------------------------------------------------------------ */
+export const heldCarts = pgTable(
+  'held_carts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    holdNumber: varchar('hold_number', { length: 30 }).notNull().unique(),
+    outletId: bigint('outlet_id', { mode: 'number' }).notNull().default(1),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    label: varchar('label', { length: 100 }),
+    customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+    // Bentuk persis `items` checkout (Fase 2 §4.4): [{ productId, variantId?, unit?, quantity, discount? }]
+    items: jsonb('items').notNull(),
+    status: varchar('status', { length: 20 }).notNull().default('held'),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    resumedAt: timestamp('resumed_at', { withTimezone: true, mode: 'date' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [
+    index('idx_held_carts_user_status').on(t.userId, t.status),
+    index('idx_held_carts_expires').on(t.expiresAt),
+    check('ck_held_carts_items_array', sql`jsonb_typeof(${t.items}) = 'array'`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -698,3 +776,7 @@ export type StockTransfer = typeof stockTransfers.$inferSelect;
 export type NewStockTransfer = typeof stockTransfers.$inferInsert;
 export type StockAdjustment = typeof stockAdjustments.$inferSelect;
 export type NewStockAdjustment = typeof stockAdjustments.$inferInsert;
+export type Shift = typeof shifts.$inferSelect;
+export type NewShift = typeof shifts.$inferInsert;
+export type HeldCart = typeof heldCarts.$inferSelect;
+export type NewHeldCart = typeof heldCarts.$inferInsert;

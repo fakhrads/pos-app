@@ -219,7 +219,7 @@ describe('commitCheckout: snapshot satuan/varian (AC-03.4)', () => {
     // invariant F3: stok gudang default juga 20
     const defaultWhId = await getDefaultWarehouseId(db);
     const [ws] = await db
-      .select({ quantity: warehouseStocks.quantity })
+      .select({ id: warehouseStocks.id, quantity: warehouseStocks.quantity })
       .from(warehouseStocks)
       .where(and(eq(warehouseStocks.warehouseId, defaultWhId), eq(warehouseStocks.productId, baseProductId), isNull(warehouseStocks.productVariantId)));
     expect(Number(ws!.quantity)).toBe(20);

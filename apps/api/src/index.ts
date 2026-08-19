@@ -19,6 +19,8 @@ import { discountsRoutes } from './routes/discounts.routes';
 import { taxRatesRoutes } from './routes/tax-rates.routes';
 import { transactionsRoutes } from './routes/transactions.routes';
 import { returnsRoutes } from './routes/returns.routes';
+import { shiftsRoutes } from './routes/shifts.routes';
+import { heldCartsRoutes } from './routes/held-carts.routes';
 import { reportsRoutes } from './routes/reports.routes';
 import { auditLogsRoutes } from './routes/audit-logs.routes';
 import { settingsRoutes } from './routes/settings.routes';
@@ -109,6 +111,8 @@ const app = new Elysia()
       .use(taxRatesRoutes)
       .use(transactionsRoutes)
       .use(returnsRoutes)
+      .use(shiftsRoutes)
+      .use(heldCartsRoutes)
       .use(reportsRoutes)
       .use(auditLogsRoutes)
       .use(settingsRoutes)
