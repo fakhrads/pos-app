@@ -304,8 +304,47 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
   }
-  
-  /* Table density — 44px row height */
+
+  /* ============================================================
+     SKELETON — Shimmer gradient animation
+     Light: #E8EBED → #F4F5F7
+     Dark: #1E2430 → #283040
+     Durasi: ~1.5s, arah: kiri→kanan
+     Hormati prefers-reduced-motion
+     ============================================================ */
+  .skeleton-base {
+    background: var(--skeleton-base);
+    position: relative;
+    overflow: hidden;
+  }
+  .skeleton-base::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--skeleton-shine) 50%,
+      transparent 100%
+    );
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  }
+  @keyframes skeleton-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  /* Hormati reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-base::after {
+      animation: skeleton-pulse 2s ease-in-out infinite;
+    }
+    @keyframes skeleton-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+  }
+
+  /* Table density — 48px row height */
   .table-dense {
     font-size: 0.875rem;
   }
@@ -314,10 +353,10 @@
     padding: 0 12px;
     font-weight: 500;
     font-size: 0.75rem;
-    color: var(--color-muted-foreground);
+    color: var(--text-muted);
   }
   .table-dense td {
-    height: 44px;
+    height: 48px;
     padding: 0 12px;
   }
   

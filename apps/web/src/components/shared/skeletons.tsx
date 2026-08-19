@@ -1,9 +1,13 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Base skeleton — uses CSS variables for theme-aware colors
- * Light: skeleton-base darker than surface
- * Dark: skeleton-base lighter than surface
+ * Base skeleton — shimmer gradient animation
+ * 
+ * Light: base #E8EBED → shine #F4F5F7 (sedikit lebih gelap dari surface)
+ * Dark: base #1E2430 → shine #283040 (sedikit lebih terang dari surface)
+ * 
+ * Shimmer: gradient kiri→kanan, durasi ~1.5s, opacity rendah
+ * Hormati prefers-reduced-motion → matikan shimmer, pakai pulse statis
  */
 function Skeleton({
   className,
@@ -12,7 +16,7 @@ function Skeleton({
   return (
     <div
       className={cn(
-        "animate-pulse rounded-md bg-skeleton-base",
+        "skeleton-base relative overflow-hidden rounded-md",
         className
       )}
       {...props}
@@ -20,9 +24,9 @@ function Skeleton({
   );
 }
 
-/**
- * Card skeleton — meniru bentuk kartu
- */
+// ============================================================
+// CARD SKELETON — meniru bentuk kartu
+// ============================================================
 export function CardSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn("rounded-lg border border-border bg-surface-raised p-4", className)}>
@@ -37,9 +41,9 @@ export function CardSkeleton({ className }: { className?: string }) {
   );
 }
 
-/**
- * Table skeleton — meniru tabel dengan baris
- */
+// ============================================================
+// TABLE SKELETON — meniru tabel dengan baris
+// ============================================================
 export function TableSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
   return (
     <div className={cn("space-y-3", className)}>
@@ -63,9 +67,9 @@ export function TableSkeleton({ rows = 5, className }: { rows?: number; classNam
   );
 }
 
-/**
- * Product grid skeleton — meniru grid produk di kasir
- */
+// ============================================================
+// PRODUCT GRID SKELETON — untuk grid produk di kasir
+// ============================================================
 export function ProductGridSkeleton({ count = 6 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -81,9 +85,9 @@ export function ProductGridSkeleton({ count = 6 }: { count?: number }) {
   );
 }
 
-/**
- * Dashboard stat skeleton — meniru kartu statistik
- */
+// ============================================================
+// STAT CARD SKELETON — untuk kartu statistik dashboard
+// ============================================================
 export function StatCardSkeleton() {
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-5">
@@ -97,9 +101,9 @@ export function StatCardSkeleton() {
   );
 }
 
-/**
- * Chart skeleton — meniru area chart
- */
+// ============================================================
+// CHART SKELETON — meniru area chart
+// ============================================================
 export function ChartSkeleton() {
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-5">
@@ -119,9 +123,9 @@ export function ChartSkeleton() {
   );
 }
 
-/**
- * Product card skeleton — untuk list produk
- */
+// ============================================================
+// PRODUCT CARD SKELETON — untuk list produk
+// ============================================================
 export function ProductCardSkeleton() {
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-raised p-3">
@@ -138,9 +142,9 @@ export function ProductCardSkeleton() {
   );
 }
 
-/**
- * Transaction list skeleton
- */
+// ============================================================
+// TRANSACTION LIST SKELETON
+// ============================================================
 export function TransactionListSkeleton({ count = 5 }: { count?: number }) {
   return (
     <div className="space-y-2">
@@ -163,9 +167,9 @@ export function TransactionListSkeleton({ count = 5 }: { count?: number }) {
   );
 }
 
-/**
- * Warehouse detail skeleton
- */
+// ============================================================
+// WAREHOUSE DETAIL SKELETON
+// ============================================================
 export function WarehouseDetailSkeleton() {
   return (
     <div className="space-y-4">
@@ -178,6 +182,31 @@ export function WarehouseDetailSkeleton() {
       <div className="rounded-lg border border-border bg-surface-raised p-5">
         <Skeleton className="h-4 w-32 mb-4" />
         <TableSkeleton rows={5} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// INVOICE RECEIPT SKELETON — untuk struk
+// ============================================================
+export function ReceiptSkeleton() {
+  return (
+    <div className="w-[58mm] mx-auto p-2 font-mono text-[10px]">
+      <Skeleton className="h-4 w-full mb-2" />
+      <Skeleton className="h-3 w-2/3 mx-auto mb-4" />
+      <div className="space-y-2 mb-4">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex justify-between">
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-px w-full mb-2" />
+      <div className="flex justify-between">
+        <Skeleton className="h-4 w-1/4" />
+        <Skeleton className="h-4 w-1/3" />
       </div>
     </div>
   );
