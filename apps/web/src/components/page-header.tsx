@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function PageHeader({
   title,
@@ -17,7 +18,10 @@ export function PageHeader({
           <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      <div className="flex flex-wrap items-center gap-2">
+        <ThemeToggle />
+        {actions}
+      </div>
     </div>
   );
 }

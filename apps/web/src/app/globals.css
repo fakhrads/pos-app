@@ -4,7 +4,11 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.625rem;
+  /* Radius — 3 levels per design spec */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -16,27 +20,33 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.456 0 0);
+  --accent: oklch(0.55 0.15 192);
+  --accent-foreground: oklch(0.985 0 0);
+  --accent-hover: oklch(0.5 0.17 192);
+  --accent-muted: oklch(0.55 0.15 192 / 0.1);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.55 0.18 162);
+  --success-muted: oklch(0.55 0.18 162 / 0.1);
+  --warning: oklch(0.75 0.18 85);
+  --warning-muted: oklch(0.75 0.18 85 / 0.1);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --ring: oklch(0.55 0.15 192);
+  --chart-1: oklch(0.55 0.15 192);
+  --chart-2: oklch(0.55 0.18 162);
+  --chart-3: oklch(0.55 0.17 280);
+  --chart-4: oklch(0.75 0.18 85);
+  --chart-5: oklch(0.6 0.2 25);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: oklch(0.55 0.15 192);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.145 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: oklch(0.55 0.15 192);
 }
 
 .dark {
@@ -81,10 +91,10 @@
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: calc(var(--radius-lg) + 4px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -193,6 +203,28 @@
    Custom utilities for redesigned UI
    ============================================================ */
 @layer utilities {
+  /* Shadow scale — 3 levels */
+  .shadow-sm {
+    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 1px 3px rgba(0,0,0,.06);
+  }
+  .shadow-md {
+    box-shadow: 0 2px 4px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.08);
+  }
+  .shadow-lg {
+    box-shadow: 0 4px 8px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.12);
+  }
+  
+  /* Dark mode shadows — use borders instead */
+  :is(.dark) .shadow-sm {
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.3);
+  }
+  :is(.dark) .shadow-md {
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 4px 12px rgba(0,0,0,.4);
+  }
+  :is(.dark) .shadow-lg {
+    box-shadow: 0 0 0 1px rgba(255,255,255,.10), 0 8px 24px rgba(0,0,0,.5);
+  }
+  
   /* Glow effect for accent elements */
   .glow-accent {
     box-shadow: 0 0 20px oklch(0.75 0.15 192 / 0.2), 0 0 60px oklch(0.75 0.15 192 / 0.05);
@@ -209,14 +241,35 @@
   
   /* Active nav item */
   .nav-active {
-    background: linear-gradient(90deg, oklch(0.75 0.15 192 / 0.12) 0%, transparent 100%);
-    border-left: 2px solid oklch(0.75 0.15 192);
+    background: oklch(0.75 0.15 192 / 0.12);
   }
   
   /* Tabular numbers for stat display */
   .stat-number {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
+  }
+  
+  /* Table density — 44px row height */
+  .table-dense {
+    font-size: 0.875rem;
+  }
+  .table-dense th {
+    height: 40px;
+    padding: 0 12px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--color-muted-foreground);
+  }
+  .table-dense td {
+    height: 44px;
+    padding: 0 12px;
+  }
+  
+  /* Number columns use tabular nums */
+  .table-dense .tabular {
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-geist-mono), monospace;
   }
   
   /* Pulse animation for status dot */

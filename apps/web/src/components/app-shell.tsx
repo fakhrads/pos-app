@@ -17,6 +17,7 @@ import {
   Tags,
   UserCircle2,
   Users,
+  Warehouse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,6 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "manager"] },
   { href: "/products", label: "Produk", icon: Boxes, roles: ["admin", "manager", "kasir"] },
   { href: "/categories", label: "Kategori", icon: Tags, roles: ["admin", "manager"] },
+  { href: "/warehouses", label: "Gudang", icon: Warehouse, roles: ["admin", "manager"] },
   { href: "/transactions", label: "Transaksi", icon: ClipboardList, roles: ["admin", "manager", "kasir"] },
   { href: "/customers", label: "Pelanggan", icon: Users, roles: ["admin", "manager", "kasir"] },
   { href: "/discounts", label: "Diskon", icon: BadgePercent, roles: ["admin", "manager"] },
@@ -69,7 +71,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Navigation */}
       <ScrollArea className="flex-1 px-3 py-4">
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-0.5">
           {items.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(item.href + "/");
@@ -79,13 +81,24 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 href={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-smooth",
+                  "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-smooth",
                   active
-                    ? "nav-active text-accent"
+                    ? "bg-accent/12 text-accent"
                     : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 )}
               >
-                <item.icon className="size-4 shrink-0" />
+                {/* Active indicator bar */}
+                {active && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-accent" />
+                )}
+                <item.icon
+                  className={cn(
+                    "size-4 shrink-0 transition-smooth",
+                    active
+                      ? "text-accent"
+                      : "text-muted-foreground group-hover:text-foreground"
+                  )}
+                />
                 {item.label}
               </Link>
             );
