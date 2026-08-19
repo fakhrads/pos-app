@@ -32,6 +32,9 @@ const checkoutBodySchema = t.Object({
   items: t.Array(
     t.Object({
       productId: t.String({ format: 'uuid' }),
+      // Fase 2 (SPEC §4.4): varian & satuan opsional — kontrak backward-compatible
+      variantId: t.Optional(t.Union([t.String({ format: 'uuid' }), t.Null()])),
+      unit: t.Optional(t.String({ maxLength: 20 })),
       quantity: t.Number({ exclusiveMinimum: 0 }),
       discount: t.Optional(itemDiscountSchema),
     }),
@@ -69,9 +72,12 @@ const posRoutes = new Elysia()
         redeemablePoints: computed.membership ? Number(computed.membership.pointsBalance) : 0,
         items: computed.lines.map((l) => ({
           productId: l.productId,
+          variantId: l.variantId,
           name: l.productName,
-          quantity: l.quantity,
+          unit: l.unit,
+          unitFactor: l.unitFactor,
           unitPrice: l.unitPrice,
+          quantity: l.quantity,
           discountAmount: l.discountAmount,
           taxAmount: l.taxAmount,
           lineTotal: l.lineTotal,

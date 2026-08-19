@@ -211,7 +211,8 @@ const managerRoutes = new Elysia()
     const items = await db
       .select()
       .from(products)
-      .where(and(isNull(products.deletedAt), eq(products.isActive, true), sql`${products.stockOnHand} <= ${threshold}`))
+      // track_stock=false (produk jasa) TIDAK muncul di stok menipis (AC-04.2)
+      .where(and(isNull(products.deletedAt), eq(products.isActive, true), eq(products.trackStock, true), sql`${products.stockOnHand} <= ${threshold}`))
       .orderBy(asc(products.stockOnHand));
     const rows = items.map((p) => ({
       productId: p.id,
@@ -304,7 +305,7 @@ const managerRoutes = new Elysia()
 
     const lowStockRes = await db.execute(sql`
       SELECT count(*)::int AS count FROM ${products}
-      WHERE ${products.deletedAt} IS NULL AND ${products.isActive}
+      WHERE ${products.deletedAt} IS NULL AND ${products.isActive} AND ${products.trackStock}
         AND ${products.stockOnHand} <= ${lowStockThreshold}
     `);
 

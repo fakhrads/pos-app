@@ -45,12 +45,27 @@ cp .env.example .env          # isi DATABASE_URL, JWT_SECRET, SEED_ADMIN_*
 
 bun install
 bun run db:migrate            # eksekusi DDL + seed (kategori, PPN 11%, settings, admin awal)
+bun run db:seed               # seed demo Fase 2: 71 produk, 4 gudang, 27 pelanggan, 300+ transaksi (idempotent; --force = reset lalu seed ulang)
 bun run dev                   # dev dengan watch (port default 3000)
 # atau
 bun run start                 # produksi
 ```
 
 Health check: `GET /health` · Docs (dev): `/api/v1/docs` (Swagger UI).
+
+## Seed demo Fase 2 (`bun run db:seed`)
+
+- Mengisi **71 produk** (60–80) Indonesia: 34 varian, 26 produk multi-satuan (dus/renceng/karung…),
+  6 produk jasa (`track_stock=false`), 4 gudang, 27 pelanggan (10 member), **300+ transaksi**
+  60 hari terakhir (WIB, invoice `TRX-YYYYMMDD-XXXX` sekuensial), 2 transaksi void.
+- **Idempotent**: marker `settings['seed.fase2.version']`; run ulang = skip (≤5 s).
+  `--force` mereset data seed lalu membuat ulang (data non-seed tidak dihapus).
+- **Self-check** (gagal → exit ≠ 0): jumlah produk/transaksi, net movement = stok akhir,
+  Σ `warehouse_stocks` = `stock_on_hand`, stok non-negatif, invoice unik, formula total.
+- **User demo** (password `Fase2Test!123`, argon2id): `admin@`, `manager@`, `kasir1@`, `kasir2@`
+  `@fakhripos.local` — **HANYA untuk dev/demo, jangan dipakai di produksi**.
+- **Guard produksi**: ditolak saat `NODE_ENV=production` kecuali `SEED_DEMO=true` (SPEC §8.2.9).
+- Dev DB lokal: PGlite wire server (`/tmp/pgtest/server.mjs`) → `postgres://postgres@127.0.0.1:55433/db_pos`.
 
 ## Env penting
 

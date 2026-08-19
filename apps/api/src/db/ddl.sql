@@ -9,26 +9,42 @@
 --   transaction_items → payments → returns → return_items →
 --   stock_movements → point_movements → audit_logs → settings
 -- (stock_movements & point_movements memakai forward-FK ke transactions/returns)
+--
+-- IDEMPOTEN (SPEC fase 2 §7.1.1/7.1.2): CREATE TYPE/TABLE/INDEX memakai
+-- guard IF NOT EXISTS sehingga `bun run db:migrate` AMAN dijalankan ulang
+-- di DB yang sudah berisi data (Fase 1 maupun sudah pernah migrate).
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS pg_trgm;  -- trusted extension (PG13+), untuk GIN name search
 
 -- ---------- ENUM TYPES ----------
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'kasir');
-CREATE TYPE membership_tier AS ENUM ('bronze', 'silver', 'gold');
-CREATE TYPE movement_type AS ENUM ('initial', 'purchase_in', 'sale_out', 'return_in', 'adjustment', 'cancellation');
-CREATE TYPE transaction_status AS ENUM ('pending', 'completed', 'cancelled');
-CREATE TYPE payment_status AS ENUM ('unpaid', 'partial', 'paid', 'refunded', 'failed');
-CREATE TYPE payment_method AS ENUM ('cash', 'qris', 'transfer');
-CREATE TYPE payment_type AS ENUM ('sale', 'refund');
-CREATE TYPE discount_type AS ENUM ('percentage', 'fixed');
-CREATE TYPE discount_scope AS ENUM ('global', 'category', 'product');
-CREATE TYPE refund_method AS ENUM ('cash', 'qris', 'transfer', 'points');
-CREATE TYPE return_status AS ENUM ('completed', 'cancelled');
-CREATE TYPE point_movement_type AS ENUM ('earned', 'redeemed', 'adjustment');
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+  CREATE TYPE user_role AS ENUM ('admin', 'manager', 'kasir'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'membership_tier') THEN
+  CREATE TYPE membership_tier AS ENUM ('bronze', 'silver', 'gold'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'movement_type') THEN
+  CREATE TYPE movement_type AS ENUM ('initial', 'purchase_in', 'sale_out', 'return_in', 'adjustment', 'cancellation'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_status') THEN
+  CREATE TYPE transaction_status AS ENUM ('pending', 'completed', 'cancelled'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
+  CREATE TYPE payment_status AS ENUM ('unpaid', 'partial', 'paid', 'refunded', 'failed'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_method') THEN
+  CREATE TYPE payment_method AS ENUM ('cash', 'qris', 'transfer'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_type') THEN
+  CREATE TYPE payment_type AS ENUM ('sale', 'refund'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discount_type') THEN
+  CREATE TYPE discount_type AS ENUM ('percentage', 'fixed'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'discount_scope') THEN
+  CREATE TYPE discount_scope AS ENUM ('global', 'category', 'product'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'refund_method') THEN
+  CREATE TYPE refund_method AS ENUM ('cash', 'qris', 'transfer', 'points'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'return_status') THEN
+  CREATE TYPE return_status AS ENUM ('completed', 'cancelled'); END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'point_movement_type') THEN
+  CREATE TYPE point_movement_type AS ENUM ('earned', 'redeemed', 'adjustment'); END IF; END $$;
 
 -- ---------- 1. USERS ----------
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          VARCHAR(100) NOT NULL,
   email         VARCHAR(255) NOT NULL,
@@ -42,10 +58,10 @@ CREATE TABLE users (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at    TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX uq_users_email_active ON users (email) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_active ON users (email) WHERE deleted_at IS NULL;
 
 -- ---------- 2. USER SESSIONS (refresh token) ----------
-CREATE TABLE user_sessions (
+CREATE TABLE IF NOT EXISTS user_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   refresh_token_hash TEXT NOT NULL,
@@ -55,11 +71,11 @@ CREATE TABLE user_sessions (
   revoked_at         TIMESTAMPTZ,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_user_sessions_user    ON user_sessions (user_id);
-CREATE INDEX idx_user_sessions_expires ON user_sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user    ON user_sessions (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions (expires_at);
 
 -- ---------- 3. CATEGORIES (1 level, BA PROD-02) ----------
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name        VARCHAR(100) NOT NULL,
   slug        VARCHAR(120) NOT NULL,
@@ -70,10 +86,10 @@ CREATE TABLE categories (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at  TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX uq_categories_slug_active ON categories (slug) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categories_slug_active ON categories (slug) WHERE deleted_at IS NULL;
 
 -- ---------- 4. PRODUCTS ----------
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   category_id   UUID NOT NULL REFERENCES categories(id),
   name          VARCHAR(200) NOT NULL,
@@ -92,15 +108,15 @@ CREATE TABLE products (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at    TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX uq_products_sku_active     ON products (sku) WHERE deleted_at IS NULL AND sku IS NOT NULL;
-CREATE UNIQUE INDEX uq_products_barcode_active ON products (barcode) WHERE deleted_at IS NULL AND barcode IS NOT NULL;
-CREATE INDEX idx_products_category  ON products (category_id);
-CREATE INDEX idx_products_name_trgm ON products USING GIN (name gin_trgm_ops);
-CREATE INDEX idx_products_low_stock ON products (min_stock)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_products_sku_active     ON products (sku) WHERE deleted_at IS NULL AND sku IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_products_barcode_active ON products (barcode) WHERE deleted_at IS NULL AND barcode IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_products_category  ON products (category_id);
+CREATE INDEX IF NOT EXISTS idx_products_name_trgm ON products USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_products_low_stock ON products (min_stock)
   WHERE deleted_at IS NULL AND is_active AND stock_on_hand <= min_stock;
 
 -- ---------- 5. CUSTOMERS ----------
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name       VARCHAR(150) NOT NULL,
   phone      VARCHAR(30),
@@ -111,11 +127,11 @@ CREATE TABLE customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX uq_customers_phone_active ON customers (phone) WHERE deleted_at IS NULL AND phone IS NOT NULL;
-CREATE INDEX idx_customers_name_trgm ON customers USING GIN (name gin_trgm_ops);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_customers_phone_active ON customers (phone) WHERE deleted_at IS NULL AND phone IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_customers_name_trgm ON customers USING GIN (name gin_trgm_ops);
 
 -- ---------- 6. MEMBERSHIPS ----------
-CREATE TABLE memberships (
+CREATE TABLE IF NOT EXISTS memberships (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id         UUID NOT NULL UNIQUE REFERENCES customers(id) ON DELETE CASCADE,
   member_code         VARCHAR(30) NOT NULL UNIQUE,
@@ -130,7 +146,7 @@ CREATE TABLE memberships (
 );
 
 -- ---------- 7. DISCOUNTS ----------
-CREATE TABLE discounts (
+CREATE TABLE IF NOT EXISTS discounts (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name                VARCHAR(100) NOT NULL,
   code                VARCHAR(50),
@@ -149,11 +165,11 @@ CREATE TABLE discounts (
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at          TIMESTAMPTZ
 );
-CREATE UNIQUE INDEX uq_discounts_code_active ON discounts (code) WHERE code IS NOT NULL AND deleted_at IS NULL;
-CREATE INDEX idx_discounts_active ON discounts (is_active, valid_from, valid_to);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_discounts_code_active ON discounts (code) WHERE code IS NOT NULL AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_discounts_active ON discounts (is_active, valid_from, valid_to);
 
 -- ---------- 8. TAX RATES ----------
-CREATE TABLE tax_rates (
+CREATE TABLE IF NOT EXISTS tax_rates (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name         VARCHAR(100) NOT NULL,
   rate         NUMERIC(5,2) NOT NULL CHECK (rate >= 0),   -- persen, 11.00 = 11%
@@ -165,7 +181,7 @@ CREATE TABLE tax_rates (
 );
 
 -- ---------- 9. TRANSACTIONS ----------
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
   id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_number        VARCHAR(30) NOT NULL UNIQUE,   -- TRX-YYYYMMDD-XXXX
   outlet_id             BIGINT NOT NULL DEFAULT 1,
@@ -188,14 +204,14 @@ CREATE TABLE transactions (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
   CHECK (total = subtotal - discount_total + tax_total - redeemed_points_value)
 );
-CREATE INDEX idx_transactions_sold_at    ON transactions (sold_at);
-CREATE INDEX idx_transactions_customer   ON transactions (customer_id);
-CREATE INDEX idx_transactions_user       ON transactions (user_id);
-CREATE INDEX idx_transactions_status     ON transactions (status);
-CREATE INDEX idx_transactions_sold_completed ON transactions (sold_at) WHERE status = 'completed';
+CREATE INDEX IF NOT EXISTS idx_transactions_sold_at    ON transactions (sold_at);
+CREATE INDEX IF NOT EXISTS idx_transactions_customer   ON transactions (customer_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user       ON transactions (user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status     ON transactions (status);
+CREATE INDEX IF NOT EXISTS idx_transactions_sold_completed ON transactions (sold_at) WHERE status = 'completed';
 
 -- ---------- 10. TRANSACTION ITEMS ----------
-CREATE TABLE transaction_items (
+CREATE TABLE IF NOT EXISTS transaction_items (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id    UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
   product_id        UUID REFERENCES products(id) ON DELETE SET NULL,
@@ -210,11 +226,11 @@ CREATE TABLE transaction_items (
   returned_quantity NUMERIC(12,3) NOT NULL DEFAULT 0 CHECK (returned_quantity >= 0),
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_tx_items_transaction ON transaction_items (transaction_id);
-CREATE INDEX idx_tx_items_product     ON transaction_items (product_id);
+CREATE INDEX IF NOT EXISTS idx_tx_items_transaction ON transaction_items (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_tx_items_product     ON transaction_items (product_id);
 
 -- ---------- 11. PAYMENTS ----------
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transaction_id   UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
   outlet_id        BIGINT NOT NULL DEFAULT 1,
@@ -229,11 +245,11 @@ CREATE TABLE payments (
   created_by       UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_payments_transaction ON payments (transaction_id);
-CREATE INDEX idx_payments_paid_at     ON payments (paid_at);
+CREATE INDEX IF NOT EXISTS idx_payments_transaction ON payments (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_payments_paid_at     ON payments (paid_at);
 
 -- ---------- 12. RETURNS ----------
-CREATE TABLE returns (
+CREATE TABLE IF NOT EXISTS returns (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   return_number    VARCHAR(30) NOT NULL UNIQUE,   -- RET-YYYYMMDD-XXXX
   outlet_id        BIGINT NOT NULL DEFAULT 1,
@@ -251,11 +267,11 @@ CREATE TABLE returns (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_returns_transaction ON returns (transaction_id);
-CREATE INDEX idx_returns_returned_at ON returns (returned_at);
+CREATE INDEX IF NOT EXISTS idx_returns_transaction ON returns (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_returns_returned_at ON returns (returned_at);
 
 -- ---------- 13. RETURN ITEMS ----------
-CREATE TABLE return_items (
+CREATE TABLE IF NOT EXISTS return_items (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   return_id           UUID NOT NULL REFERENCES returns(id) ON DELETE CASCADE,
   transaction_item_id UUID NOT NULL REFERENCES transaction_items(id),
@@ -267,11 +283,11 @@ CREATE TABLE return_items (
   reason              TEXT NOT NULL,   -- wajib (BA RET-04)
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_return_items_return  ON return_items (return_id);
-CREATE INDEX idx_return_items_tx_item ON return_items (transaction_item_id);
+CREATE INDEX IF NOT EXISTS idx_return_items_return  ON return_items (return_id);
+CREATE INDEX IF NOT EXISTS idx_return_items_tx_item ON return_items (transaction_item_id);
 
 -- ---------- 14. STOCK MOVEMENTS (ledger) ----------
-CREATE TABLE stock_movements (
+CREATE TABLE IF NOT EXISTS stock_movements (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id     UUID NOT NULL REFERENCES products(id),
   type           movement_type NOT NULL,
@@ -285,12 +301,12 @@ CREATE TABLE stock_movements (
   created_by     UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_stock_movements_product ON stock_movements (product_id, created_at DESC);
-CREATE INDEX idx_stock_movements_tx      ON stock_movements (transaction_id);
-CREATE INDEX idx_stock_movements_return  ON stock_movements (return_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements (product_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_tx      ON stock_movements (transaction_id);
+CREATE INDEX IF NOT EXISTS idx_stock_movements_return  ON stock_movements (return_id);
 
 -- ---------- 15. POINT MOVEMENTS ----------
-CREATE TABLE point_movements (
+CREATE TABLE IF NOT EXISTS point_movements (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   membership_id  UUID NOT NULL REFERENCES memberships(id) ON DELETE CASCADE,
   transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
@@ -301,10 +317,10 @@ CREATE TABLE point_movements (
   created_by     UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_point_movements_membership ON point_movements (membership_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_point_movements_membership ON point_movements (membership_id, created_at DESC);
 
 -- ---------- 16. AUDIT LOGS (append-only) ----------
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID REFERENCES users(id) ON DELETE SET NULL,
   action      VARCHAR(50) NOT NULL,
@@ -316,13 +332,13 @@ CREATE TABLE audit_logs (
   user_agent  TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_audit_entity  ON audit_logs (entity_type, entity_id);
-CREATE INDEX idx_audit_created ON audit_logs (created_at DESC);
-CREATE INDEX idx_audit_user    ON audit_logs (user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_entity  ON audit_logs (entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user    ON audit_logs (user_id);
 -- REVOKE UPDATE, DELETE ON audit_logs FROM pos_app;  -- jalankan setelah role aplikasi dibuat
 
 -- ---------- 17. SETTINGS ----------
-CREATE TABLE settings (
+CREATE TABLE IF NOT EXISTS settings (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   key         VARCHAR(100) NOT NULL UNIQUE,
   value       JSONB NOT NULL,
@@ -345,8 +361,11 @@ BEGIN
   FOREACH t IN ARRAY ARRAY['users','categories','products','customers','memberships',
                           'discounts','tax_rates','transactions','returns']
   LOOP
-    EXECUTE format('CREATE TRIGGER trg_%s_updated_at BEFORE UPDATE ON %I
-                    FOR EACH ROW EXECUTE FUNCTION set_updated_at()', t, t);
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                   WHERE tgname = format('trg_%s_updated_at', t) AND tgrelid = format('%I', t)::regclass) THEN
+      EXECUTE format('CREATE TRIGGER trg_%s_updated_at BEFORE UPDATE ON %I
+                      FOR EACH ROW EXECUTE FUNCTION set_updated_at()', t, t);
+    END IF;
   END LOOP;
 END $$;
 
@@ -354,7 +373,7 @@ END $$;
 -- SEED DATA (spec/db-schema.md §7) — via migration
 -- ============================================================
 
--- Kategori awal (BA §9)
+-- Kategori awal (BA §9) — di-upsert lagi oleh seed Fase 2 (8 kategori)
 INSERT INTO categories (name, slug, sort_order) VALUES
   ('Makanan', 'makanan', 1),
   ('Minuman', 'minuman', 2),

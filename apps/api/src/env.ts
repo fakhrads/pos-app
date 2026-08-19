@@ -23,6 +23,8 @@ export const env = {
   SEED_ADMIN_EMAIL: process.env.SEED_ADMIN_EMAIL ?? '',
   SEED_ADMIN_PASSWORD: process.env.SEED_ADMIN_PASSWORD ?? '',
   SEED_ADMIN_NAME: process.env.SEED_ADMIN_NAME ?? 'Administrator',
+  /** Guard seed demo (`bun run db:seed`) — wajib true di luar produksi; SPEC §8.2.9 */
+  SEED_DEMO: process.env.SEED_DEMO === 'true',
 };
 
 export function assertEnv(): void {

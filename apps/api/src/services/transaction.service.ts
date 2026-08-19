@@ -5,7 +5,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { transactions, transactionItems, payments, products, stockMovements, memberships, pointMovements, returns } from '../db/schema';
+import { transactions, transactionItems, payments, products, productVariants, stockMovements, memberships, pointMovements, returns } from '../db/schema';
 import { fail } from '../lib/errors';
 import { toQty } from '../lib/money';
 import { writeAudit } from '../lib/audit';
@@ -32,26 +32,50 @@ export async function cancelTransaction(
     if (!trx) fail('NOT_FOUND', 'Transaksi tidak ditemukan', 404);
     if (trx.status === 'cancelled') fail('ALREADY_CANCELLED', 'Transaksi sudah dibatalkan', 409);
 
-    // Restock sisa (qty − returned) per item
+    // Restock sisa (qty − returned) per item — dalam UNIT DASAR (SPEC §8.1):
+    // quantity item = satuan penjualan → stok kembali = qty × unit_factor.
+    // Item ber-varian → stok balik ke product_variants.
     const items = await tx.select().from(transactionItems).where(eq(transactionItems.transactionId, trx.id));
     for (const it of items) {
-      const remaining = toQty(Number(it.quantity) - Number(it.returnedQuantity));
-      if (remaining <= 0 || !it.productId) continue;
-      const [p] = await tx.select().from(products).where(eq(products.id, it.productId)).for('update').limit(1);
-      if (!p) continue;
-      const before = Number(p.stockOnHand);
-      const after = toQty(before + remaining);
-      await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, p.id));
-      await tx.insert(stockMovements).values({
-        productId: p.id,
-        type: 'cancellation',
-        quantity: remaining,
-        beforeQty: before,
-        afterQty: after,
-        transactionId: trx.id,
-        note: `Void ${trx.invoiceNumber}: ${reason}`,
-        createdBy: user.id,
-      });
+      const remainingSale = toQty(Number(it.quantity) - Number(it.returnedQuantity));
+      if (remainingSale <= 0 || !it.productId) continue;
+      const factor = Number(it.unitFactor ?? 1);
+      const remaining = toQty(remainingSale * factor);
+
+      if (it.productVariantId) {
+        const [v] = await tx.select().from(productVariants).where(eq(productVariants.id, it.productVariantId)).for('update').limit(1);
+        if (!v) continue;
+        const before = Number(v.stockOnHand);
+        const after = toQty(before + remaining);
+        await tx.update(productVariants).set({ stockOnHand: after }).where(eq(productVariants.id, v.id));
+        await tx.insert(stockMovements).values({
+          productId: it.productId,
+          productVariantId: v.id,
+          type: 'cancellation',
+          quantity: remaining,
+          beforeQty: before,
+          afterQty: after,
+          transactionId: trx.id,
+          note: `Void ${trx.invoiceNumber}: ${reason}`,
+          createdBy: user.id,
+        });
+      } else {
+        const [p] = await tx.select().from(products).where(eq(products.id, it.productId)).for('update').limit(1);
+        if (!p) continue;
+        const before = Number(p.stockOnHand);
+        const after = toQty(before + remaining);
+        await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, p.id));
+        await tx.insert(stockMovements).values({
+          productId: p.id,
+          type: 'cancellation',
+          quantity: remaining,
+          beforeQty: before,
+          afterQty: after,
+          transactionId: trx.id,
+          note: `Void ${trx.invoiceNumber}: ${reason}`,
+          createdBy: user.id,
+        });
+      }
     }
 
     // Payments sale → baris refund

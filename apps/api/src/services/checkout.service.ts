@@ -15,6 +15,8 @@ import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db, type DbOrTx } from '../db';
 import {
   products,
+  productVariants,
+  productUnits,
   customers,
   memberships,
   transactions,
@@ -31,6 +33,7 @@ import { fail } from '../lib/errors';
 import { clientIp } from '../lib/http';
 import { formatIdr } from '../lib/http';
 import { roundMoney, percentOf, toQty, taxExclusive, taxInclusive, pointsFrom } from '../lib/money';
+import { convertToBaseQty, costForUnit } from '../lib/units';
 import { getSettings, numSetting } from '../lib/settings';
 import { writeAudit } from '../lib/audit';
 import { reserveIdempotency, completeIdempotency, clearIdempotency } from '../lib/idempotency';
@@ -43,6 +46,10 @@ import type { AuthUser } from '../middleware/auth';
 /* ------------------------------------------------------------------ */
 export interface ItemInput {
   productId: string;
+  /** Fase 2 (SPEC §4.4): wajib untuk produk ber-varian. */
+  variantId?: string | null;
+  /** Fase 2: satuan penjualan; kosong/unit dasar → unit dasar. */
+  unit?: string;
   quantity: number;
   discount?: { type: 'percentage' | 'fixed'; value: number; reason?: string };
 }
@@ -69,10 +76,13 @@ export interface CheckoutInput {
 
 interface ComputedLine {
   productId: string | null;
+  variantId: string | null;
   productName: string;
   productSku: string;
   categoryId: string;
-  quantity: number;
+  quantity: number; // qty dalam satuan PENJUALAN (unit)
+  unit: string; // snapshot satuan penjualan
+  unitFactor: number; // snapshot faktor konversi ke unit dasar
   unitPrice: number;
   costPrice: number;
   discountAmount: number;
@@ -80,10 +90,12 @@ interface ComputedLine {
   lineTotal: number;
   availableStock: number;
   isTaxable: boolean;
+  trackStock: boolean;
 }
 interface ComputedStockMove {
   productId: string;
-  quantity: number;
+  productVariantId: string | null;
+  quantity: number; // dalam unit dasar
   beforeQty: number;
   afterQty: number;
   type: 'sale_out';
@@ -158,25 +170,94 @@ export async function computeTransaction(
   const prodRows = await query.orderBy(products.id);
   const prodMap = new Map(prodRows.map((p) => [p.id, p]));
 
+  // Fase 2 (SPEC §4.4): resolusi varian & satuan — load sekali per request
+  const variantIds = [...new Set(input.items.map((i) => i.variantId).filter((v): v is string => !!v))];
+  let variantRows: (typeof productVariants.$inferSelect)[] = [];
+  if (variantIds.length > 0) {
+    const vBase = dbOrTx
+      .select()
+      .from(productVariants)
+      .where(and(inArray(productVariants.id, variantIds), isNull(productVariants.deletedAt)));
+    const vQuery = opts.forUpdate ? (vBase.for('update') as typeof vBase) : vBase;
+    variantRows = await vQuery.orderBy(productVariants.id);
+  }
+  const variantMap = new Map(variantRows.map((v) => [v.id, v]));
+  const unitRows = await dbOrTx.select().from(productUnits).where(inArray(productUnits.productId, ids));
+  const unitMap = new Map<string, (typeof productUnits.$inferSelect)>();
+  for (const u of unitRows) unitMap.set(`${u.productId}:${u.unit.toLowerCase()}`, u);
+
   const s = await getSettings();
   const maxManualPct = numSetting(s, 'discount.manual_max_percent', 20);
   const maxManualAmt = numSetting(s, 'discount.manual_max_amount', 50000);
 
   const lines: ComputedLine[] = [];
   let subtotal = 0;
-  const stockIssues: { productId: string; available: number; requested: number }[] = [];
+  const stockIssues: {
+    productId: string;
+    variantId: string | null;
+    unit: string;
+    available: number; // unit dasar (SPEC §7.4.2)
+    requested: number; // unit dasar
+    availableInUnit: number; // floor, satuan pilihan
+    requestedInUnit: number; // qty satuan pilihan
+  }[] = [];
 
-  for (const item of input.items) {
+  for (let itemIdx = 0; itemIdx < input.items.length; itemIdx++) {
+    const item = input.items[itemIdx]!;
     const p = prodMap.get(item.productId);
     if (!p) fail('NOT_FOUND', `Produk tidak ditemukan (${item.productId})`, 404);
     if (!p.isActive) fail('PRODUCT_INACTIVE', `Produk '${p.name}' sedang nonaktif`, 422);
     const qty = toQty(item.quantity);
-    if (qty <= 0) fail('VALIDATION_ERROR', `Qty '${p.name}' harus lebih dari 0`, 422);
-    if (qty > Number(p.stockOnHand)) {
-      stockIssues.push({ productId: p.id, available: Number(p.stockOnHand), requested: qty });
+    if (qty <= 0) fail('VALIDATION_ERROR', `Qty '${p.name}' harus lebih dari 0 (presisi 0.001)`, 422, { field: `items[${itemIdx}].quantity` });
+
+    // 1) Resolusi varian (SPEC §4.4 urutan evaluasi)
+    let variant: (typeof productVariants.$inferSelect) | null = null;
+    let stockBase: number;
+    if (item.variantId) {
+      variant = variantMap.get(item.variantId) ?? null;
+      if (!variant || variant.productId !== p.id) fail('VARIANT_NOT_FOUND', 'Varian tidak ditemukan untuk produk ini', 422, { field: `items[${itemIdx}].variantId` });
+      if (!variant.isActive) fail('VALIDATION_ERROR', `Varian '${variant.name}' sedang nonaktif`, 422);
+      stockBase = Number(variant.stockOnHand);
+    } else {
+      if (p.hasVariants) {
+        fail('VALIDATION_ERROR', `Produk '${p.name}' ber-varian — wajib pilih varian`, 422, { field: `items[${itemIdx}].variantId` });
+      }
+      stockBase = Number(p.stockOnHand);
     }
 
-    const lineSubtotal = roundMoney(Number(p.sellingPrice) * qty);
+    // 2) Resolusi satuan (SPEC §4.4.2)
+    const baseUnit = p.unit;
+    let unit = (item.unit ?? '').trim() || baseUnit;
+    let unitFactor = 1;
+    let unitPrice = variant ? Number(variant.sellingPrice) : Number(p.sellingPrice);
+    const costBase = variant ? Number(variant.costPrice) : Number(p.costPrice);
+    if (unit.toLowerCase() !== baseUnit.toLowerCase()) {
+      const pu = unitMap.get(`${p.id}:${unit.toLowerCase()}`);
+      if (!pu) fail('UNIT_NOT_FOUND', `Satuan '${unit}' tidak terdaftar untuk produk '${p.name}'`, 422, { field: `items[${itemIdx}].unit` });
+      if (!pu.isSellable) fail('UNIT_NOT_SELLABLE', `Satuan '${unit}' tidak boleh dijual`, 422, { field: `items[${itemIdx}].unit` });
+      unit = pu.unit; // normalisasi huruf dari DB
+      unitFactor = Number(pu.factor);
+      unitPrice = Number(pu.sellPrice); // server SELALU hitung ulang dari DB (§5.2)
+    }
+
+    // 3) Hitung konversi & snapshot harga
+    const qtyStock = convertToBaseQty(qty, unitFactor); // round3(qty × factor)
+    const costPrice = costForUnit(costBase, unitFactor);
+
+    // 4) Cek stok (kecuali track_stock=false — produk jasa, AC-04.1)
+    if (p.trackStock && qtyStock > stockBase) {
+      stockIssues.push({
+        productId: p.id,
+        variantId: variant?.id ?? null,
+        unit,
+        available: stockBase,
+        requested: qtyStock,
+        availableInUnit: Math.floor(stockBase / unitFactor),
+        requestedInUnit: qty,
+      });
+    }
+
+    const lineSubtotal = roundMoney(unitPrice * qty);
     let dAmount = 0;
     if (item.discount) {
       if (item.discount.type === 'percentage') {
@@ -190,22 +271,32 @@ export async function computeTransaction(
     subtotal += lineSubtotal;
     lines.push({
       productId: p.id,
-      productName: p.name,
-      productSku: p.sku ?? '',
+      variantId: variant?.id ?? null,
+      productName: variant ? `${p.name} — ${variant.name}` : p.name,
+      productSku: variant?.sku ?? p.sku ?? '',
       categoryId: p.categoryId,
       quantity: qty,
-      unitPrice: Number(p.sellingPrice),
-      costPrice: Number(p.costPrice),
+      unit,
+      unitFactor,
+      unitPrice,
+      costPrice,
       discountAmount: dAmount,
       taxAmount: 0,
       lineTotal: 0,
-      availableStock: Number(p.stockOnHand),
+      availableStock: p.trackStock ? Math.floor(stockBase / unitFactor) : Number(p.stockOnHand),
       isTaxable: p.isTaxable,
+      trackStock: p.trackStock,
     });
   }
   if (stockIssues.length > 0) {
-    const first = prodMap.get(stockIssues[0]!.productId);
-    fail('STOCK_INSUFFICIENT', `Stok produk '${first?.name}' tidak cukup (tersisa ${stockIssues[0]!.available})`, 409, stockIssues);
+    const first = stockIssues[0]!;
+    const firstName = first.variantId ? variantMap.get(first.variantId)?.name : prodMap.get(first.productId)?.name;
+    fail(
+      'STOCK_INSUFFICIENT',
+      `Stok '${firstName}' tidak cukup (tersisa ${first.available} ${first.unit === 'pcs' ? 'pcs' : first.unit}, diminta ${first.requested} ${first.unit === 'pcs' ? 'pcs' : first.unit})`,
+      409,
+      stockIssues,
+    );
   }
 
   // Diskon transaksi manual (setelah diskon item)
@@ -326,16 +417,22 @@ export async function computeTransaction(
 
   for (const l of lines) l.lineTotal = l.unitPrice * l.quantity - l.discountAmount + l.taxAmount;
 
-  const stockMovements: ComputedStockMove[] = lines.map((l) => {
-    const before = Number(prodMap.get(l.productId!)!.stockOnHand);
-    return {
+  // Movement stok: TIDAK ada untuk produk jasa (track_stock=false, AC-04.1);
+  // quantity dalam UNIT DASAR = qty penjualan × unit_factor (SPEC §3.3, §5.1)
+  const computedStockMovements: ComputedStockMove[] = [];
+  for (const l of lines) {
+    if (!l.trackStock) continue;
+    const before = l.variantId ? Number(variantMap.get(l.variantId)!.stockOnHand) : Number(prodMap.get(l.productId!)!.stockOnHand);
+    const qtyStock = convertToBaseQty(l.quantity, l.unitFactor);
+    computedStockMovements.push({
       productId: l.productId!,
-      quantity: l.quantity,
+      productVariantId: l.variantId,
+      quantity: qtyStock,
       beforeQty: before,
-      afterQty: toQty(before - l.quantity),
+      afterQty: toQty(before - qtyStock),
       type: 'sale_out',
-    };
-  });
+    });
+  }
 
   const payments2 = opts.validatePayments === false ? [] : processPayments(input.payments, total);
 
@@ -352,7 +449,7 @@ export async function computeTransaction(
     discountId,
     discountName: manualName ?? promoName,
     membership,
-    stockMovements,
+    stockMovements: computedStockMovements,
     payments: payments2,
   };
 }
@@ -472,6 +569,9 @@ export async function commitCheckout(
               computed.lines.map((l) => ({
                 transactionId: trx.id,
                 productId: l.productId,
+                productVariantId: l.variantId,
+                unit: l.unit,
+                unitFactor: l.unitFactor,
                 productName: l.productName,
                 productSku: l.productSku,
                 quantity: l.quantity,
@@ -502,11 +602,18 @@ export async function commitCheckout(
             )
             .returning();
 
-          // Stock: update denormalisasi + ledger, dalam transaksi yang sama
+          // Stock: update denormalisasi + ledger, dalam transaksi yang sama.
+          // Varian → product_variants; non-varian → products (stok sudah di-lock
+          // & divalidasi di computeTransaction).
           for (const sm of computed.stockMovements) {
-            await tx.update(products).set({ stockOnHand: sm.afterQty }).where(eq(products.id, sm.productId));
+            if (sm.productVariantId) {
+              await tx.update(productVariants).set({ stockOnHand: sm.afterQty }).where(eq(productVariants.id, sm.productVariantId));
+            } else {
+              await tx.update(products).set({ stockOnHand: sm.afterQty }).where(eq(products.id, sm.productId));
+            }
             await tx.insert(stockMovements).values({
               productId: sm.productId,
+              productVariantId: sm.productVariantId,
               type: sm.type,
               quantity: sm.quantity,
               beforeQty: sm.beforeQty,

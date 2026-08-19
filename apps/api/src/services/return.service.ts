@@ -15,6 +15,7 @@ import {
   returns,
   returnItems,
   products,
+  productVariants,
   stockMovements,
   memberships,
   pointMovements,
@@ -130,24 +131,48 @@ export async function createReturn(
     }
 
     /* ---------- 6. Restock (return_in) + refund payment / kredit poin ---------- */
+    // Stok kembali dalam UNIT DASAR: qty return (satuan penjualan) × unit_factor.
+    // Item ber-varian → stok balik ke product_variants (SPEC §8.1).
     for (const p of processed) {
       if (!p.item.productId) continue;
-      const [prod] = await tx.select().from(products).where(eq(products.id, p.item.productId)).for('update').limit(1);
-      if (!prod) continue;
-      const before = Number(prod.stockOnHand);
-      const after = toQty(before + p.quantity);
-      await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, prod.id));
-      await tx.insert(stockMovements).values({
-        productId: prod.id,
-        type: 'return_in',
-        quantity: p.quantity,
-        beforeQty: before,
-        afterQty: after,
-        transactionId: trx.id,
-        returnId: ret.id,
-        note: `Return ${returnNumber}: ${p.reason}`,
-        createdBy: user.id,
-      });
+      const factor = Number(p.item.unitFactor ?? 1);
+      const qtyBase = toQty(p.quantity * factor);
+      if (p.item.productVariantId) {
+        const [v] = await tx.select().from(productVariants).where(eq(productVariants.id, p.item.productVariantId)).for('update').limit(1);
+        if (!v) continue;
+        const before = Number(v.stockOnHand);
+        const after = toQty(before + qtyBase);
+        await tx.update(productVariants).set({ stockOnHand: after }).where(eq(productVariants.id, v.id));
+        await tx.insert(stockMovements).values({
+          productId: p.item.productId,
+          productVariantId: v.id,
+          type: 'return_in',
+          quantity: qtyBase,
+          beforeQty: before,
+          afterQty: after,
+          transactionId: trx.id,
+          returnId: ret.id,
+          note: `Return ${returnNumber}: ${p.reason}`,
+          createdBy: user.id,
+        });
+      } else {
+        const [prod] = await tx.select().from(products).where(eq(products.id, p.item.productId)).for('update').limit(1);
+        if (!prod) continue;
+        const before = Number(prod.stockOnHand);
+        const after = toQty(before + qtyBase);
+        await tx.update(products).set({ stockOnHand: after }).where(eq(products.id, prod.id));
+        await tx.insert(stockMovements).values({
+          productId: prod.id,
+          type: 'return_in',
+          quantity: qtyBase,
+          beforeQty: before,
+          afterQty: after,
+          transactionId: trx.id,
+          returnId: ret.id,
+          note: `Return ${returnNumber}: ${p.reason}`,
+          createdBy: user.id,
+        });
+      }
     }
 
     let refundPayment: (typeof payments.$inferSelect) | null = null;

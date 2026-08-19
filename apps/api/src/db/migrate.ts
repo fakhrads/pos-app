@@ -18,6 +18,7 @@ import { env } from '../env';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DDL_PATH = path.join(__dirname, 'ddl.sql');
+const DDL_PHASE2_PATH = path.join(__dirname, 'ddl-phase2.sql');
 
 async function main(): Promise<void> {
   console.log('[migrate] target:', env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
@@ -26,6 +27,10 @@ async function main(): Promise<void> {
   // Simple query protocol postgres.js mendukung multi-statement
   await client.unsafe(readFileSync(DDL_PATH, 'utf-8'));
   console.log('[migrate] DDL + seed data selesai (17 tabel, 12 enum, trigger, seed).');
+
+  // Fase 2 (SPEC §8.2.2): DDL idempotent — tabel baru + alter kolom
+  await client.unsafe(readFileSync(DDL_PHASE2_PATH, 'utf-8'));
+  console.log('[migrate] DDL Fase 2 selesai (6 tabel baru, 8 kolom baru, idempotent).');
 
   // ---------- Seed admin awal ----------
   if (!env.SEED_ADMIN_EMAIL || !env.SEED_ADMIN_PASSWORD) {

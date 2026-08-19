@@ -46,8 +46,12 @@ export async function rawFetch<T>(
 ): Promise<T> {
   const { method = "GET", body, headers = {}, skipAuthRetry = false, signal } = options;
 
+  // FormData (multipart upload, mis. import Excel) — jangan set Content-Type,
+  // biarkan browser mengisi boundary secara otomatis.
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const finalHeaders: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     ...headers,
   };
 
@@ -61,7 +65,7 @@ export async function rawFetch<T>(
     res = await fetch(url, {
       method,
       headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
       signal,
     });
   } catch {

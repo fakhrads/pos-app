@@ -11,6 +11,8 @@ import { authRoutes } from './routes/auth.routes';
 import { usersRoutes } from './routes/users.routes';
 import { categoriesRoutes } from './routes/categories.routes';
 import { productsRoutes } from './routes/products.routes';
+import { productVariantsRoutes } from './routes/product-variants.routes';
+import { productUnitsRoutes } from './routes/product-units.routes';
 import { customersRoutes } from './routes/customers.routes';
 import { membershipsRoutes } from './routes/memberships.routes';
 import { discountsRoutes } from './routes/discounts.routes';
@@ -96,6 +98,8 @@ const app = new Elysia()
       .use(usersRoutes)
       .use(categoriesRoutes)
       .use(productsRoutes)
+      .use(productVariantsRoutes)
+      .use(productUnitsRoutes)
       .use(customersRoutes)
       .use(membershipsRoutes)
       .use(discountsRoutes)

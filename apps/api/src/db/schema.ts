@@ -22,6 +22,7 @@ import {
   numeric,
   integer,
   timestamp,
+  date,
   jsonb,
   uniqueIndex,
   index,
@@ -142,6 +143,10 @@ export const products = pgTable(
     outletId: bigint('outlet_id', { mode: 'number' }).notNull().default(1),
     isActive: boolean('is_active').notNull().default(true),
     isTaxable: boolean('is_taxable').notNull().default(true),
+    // Fase 2 (SPEC §3.1) — semua kolom berdefault, backward-compatible
+    hasVariants: boolean('has_variants').notNull().default(false),
+    trackStock: boolean('track_stock').notNull().default(true),
+    expiryDate: date('expiry_date', { mode: 'string' }),
     ...timestamps,
     deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
   },
@@ -295,6 +300,10 @@ export const transactionItems = pgTable(
       .notNull()
       .references(() => transactions.id, { onDelete: 'cascade' }),
     productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+    // Fase 2 (SPEC §3.4) — snapshot satuan & varian. product_id tetap = induk (laporan existing).
+    productVariantId: uuid('product_variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
+    unit: varchar('unit', { length: 20 }).notNull().default('pcs'),
+    unitFactor: numeric('unit_factor', { precision: 12, scale: 3, mode: 'number' }).notNull().default(1),
     productName: varchar('product_name', { length: 200 }).notNull(),
     productSku: varchar('product_sku', { length: 50 }).notNull(),
     quantity: numeric('quantity', { precision: 12, scale: 3, mode: 'number' }).notNull(),
@@ -397,6 +406,8 @@ export const stockMovements = pgTable(
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id),
+    // Fase 2 (SPEC §3.5) — mutasi stok varian: product_id = induk, product_variant_id = varian
+    productVariantId: uuid('product_variant_id').references(() => productVariants.id, { onDelete: 'set null' }),
     type: movementType('type').notNull(),
     quantity: numeric('quantity', { precision: 12, scale: 3, mode: 'number' }).notNull(),
     beforeQty: numeric('before_qty', { precision: 12, scale: 3, mode: 'number' }).notNull(),
@@ -475,6 +486,179 @@ export const settings = pgTable(
   },
 );
 
+/* ------------------------------------------------------------------ */
+/* 18. PRODUCT_VARIANTS — Fase 2 (SPEC §3.2, PROD-12/R12)              */
+/*     Varian = ukuran/warna/rasa; stok & harga sendiri (unit dasar induk) */
+/* ------------------------------------------------------------------ */
+export const productVariants = pgTable(
+  'product_variants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 200 }).notNull(),
+    sku: varchar('sku', { length: 50 }),
+    barcode: varchar('barcode', { length: 100 }),
+    costPrice: bigint('cost_price', { mode: 'number' }).notNull().default(0),
+    sellingPrice: bigint('selling_price', { mode: 'number' }).notNull().default(0),
+    stockOnHand: numeric('stock_on_hand', { precision: 12, scale: 3, mode: 'number' }).notNull().default(0),
+    minStock: numeric('min_stock', { precision: 12, scale: 3, mode: 'number' }).notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [
+    uniqueIndex('uq_product_variants_sku_active').on(t.sku).where(sql`${t.deletedAt} IS NULL AND ${t.sku} IS NOT NULL`),
+    uniqueIndex('uq_product_variants_barcode_active')
+      .on(t.barcode)
+      .where(sql`${t.deletedAt} IS NULL AND ${t.barcode} IS NOT NULL`),
+    index('idx_product_variants_product').on(t.productId, t.isActive),
+    check('ck_variants_cost', sql`${t.costPrice} >= 0`),
+    check('ck_variants_selling', sql`${t.sellingPrice} >= 0`),
+    check('ck_variants_stock', sql`${t.stockOnHand} >= 0`),
+    check('ck_variants_min_stock', sql`${t.minStock} >= 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 19. PRODUCT_UNITS — satuan tambahan per produk (SPEC §3.3, R1)      */
+/*     Menggantikan `unit_conversions` (keputusan §1.3.1).             */
+/* ------------------------------------------------------------------ */
+export const productUnits = pgTable(
+  'product_units',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    unit: varchar('unit', { length: 20 }).notNull(),
+    factor: numeric('factor', { precision: 12, scale: 3, mode: 'number' }).notNull(),
+    sellPrice: bigint('sell_price', { mode: 'number' }).notNull().default(0),
+    isSellable: boolean('is_sellable').notNull().default(true),
+    isPurchaseUnit: boolean('is_purchase_unit').notNull().default(false),
+    minQty: numeric('min_qty', { precision: 12, scale: 3, mode: 'number' }).notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('uq_product_units_product_unit').on(t.productId, t.unit),
+    index('idx_product_units_product').on(t.productId),
+    check('ck_units_factor', sql`${t.factor} > 0`),
+    check('ck_units_sell_price', sql`${t.sellPrice} >= 0`),
+    check('ck_units_min_qty', sql`${t.minQty} > 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 20. WAREHOUSES — Fase 2 schema P0, CRUD Fase 3 (SPEC §3.6)          */
+/* ------------------------------------------------------------------ */
+export const warehouses = pgTable(
+  'warehouses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: varchar('code', { length: 20 }).notNull(),
+    name: varchar('name', { length: 150 }).notNull(),
+    address: text('address'),
+    pic: varchar('pic', { length: 100 }),
+    capacity: numeric('capacity', { precision: 12, scale: 3, mode: 'number' }).notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [
+    uniqueIndex('uq_warehouses_code_active').on(t.code).where(sql`${t.deletedAt} IS NULL`),
+    check('ck_warehouses_capacity', sql`${t.capacity} >= 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 21. WAREHOUSE_STOCKS — stok per gudang (SPEC §3.7)                  */
+/*     Invariant seed: Σ warehouse_stocks = stock_on_hand per produk/varian */
+/* ------------------------------------------------------------------ */
+export const warehouseStocks = pgTable(
+  'warehouse_stocks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    warehouseId: uuid('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id, { onDelete: 'cascade' }),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    productVariantId: uuid('product_variant_id').references(() => productVariants.id, { onDelete: 'cascade' }),
+    quantity: numeric('quantity', { precision: 12, scale: 3, mode: 'number' }).notNull().default(0),
+    minStock: numeric('min_stock', { precision: 12, scale: 3, mode: 'number' }).notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('uq_wh_stocks_product')
+      .on(t.warehouseId, t.productId)
+      .where(sql`${t.productVariantId} IS NULL`),
+    uniqueIndex('uq_wh_stocks_variant')
+      .on(t.warehouseId, t.productId, t.productVariantId)
+      .where(sql`${t.productVariantId} IS NOT NULL`),
+    index('idx_wh_stocks_product').on(t.productId),
+    check('ck_wh_stocks_qty', sql`${t.quantity} >= 0`),
+    check('ck_wh_stocks_min', sql`${t.minStock} >= 0`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 22. STOCK_TRANSFERS — Fase 2 schema P0, API Fase 3 (SPEC §3.8)      */
+/* ------------------------------------------------------------------ */
+export const stockTransfers = pgTable(
+  'stock_transfers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    fromWarehouseId: uuid('from_warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    toWarehouseId: uuid('to_warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id),
+    productVariantId: uuid('product_variant_id').references(() => productVariants.id),
+    quantity: numeric('quantity', { precision: 12, scale: 3, mode: 'number' }).notNull(),
+    notes: text('notes'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_stock_transfers_from').on(t.fromWarehouseId),
+    index('idx_stock_transfers_to').on(t.toWarehouseId),
+    check('ck_transfers_qty', sql`${t.quantity} > 0`),
+    check('ck_transfers_diff', sql`${t.fromWarehouseId} <> ${t.toWarehouseId}`),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* 23. STOCK_ADJUSTMENTS — Fase 2 schema P0, API Fase 3 (SPEC §3.8)    */
+/* ------------------------------------------------------------------ */
+export const stockAdjustments = pgTable(
+  'stock_adjustments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    warehouseId: uuid('warehouse_id')
+      .notNull()
+      .references(() => warehouses.id),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id),
+    productVariantId: uuid('product_variant_id').references(() => productVariants.id),
+    quantityDelta: numeric('quantity_delta', { precision: 12, scale: 3, mode: 'number' }).notNull(),
+    reason: varchar('reason', { length: 50 }).notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('idx_stock_adjustments_wh').on(t.warehouseId),
+    check('ck_adjustments_delta', sql`${t.quantityDelta} <> 0`),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -492,3 +676,13 @@ export type StockMovement = typeof stockMovements.$inferSelect;
 export type PointMovement = typeof pointMovements.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
+export type ProductVariant = typeof productVariants.$inferSelect;
+export type NewProductVariant = typeof productVariants.$inferInsert;
+export type ProductUnit = typeof productUnits.$inferSelect;
+export type NewProductUnit = typeof productUnits.$inferInsert;
+export type Warehouse = typeof warehouses.$inferSelect;
+export type NewWarehouse = typeof warehouses.$inferInsert;
+export type WarehouseStock = typeof warehouseStocks.$inferSelect;
+export type NewWarehouseStock = typeof warehouseStocks.$inferInsert;
+export type StockTransfer = typeof stockTransfers.$inferSelect;
+export type StockAdjustment = typeof stockAdjustments.$inferSelect;

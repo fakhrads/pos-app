@@ -66,6 +66,9 @@ export interface Category {
 }
 
 // ---------- Products ----------
+// Fase 2 (SPEC §3.1): hasVariants, trackStock, expiryDate, deleted_at.
+// Field baru opsional agar dummy data (data/products.ts) tetap kompatibel;
+// backend selalu mengembalikannya.
 export interface Product {
   id: string;
   categoryId: string;
@@ -80,9 +83,15 @@ export interface Product {
   minStock: number;
   isActive: boolean;
   isTaxable: boolean;
+  hasVariants?: boolean;
+  trackStock?: boolean;
+  expiryDate?: string | null;
+  variantCount?: number;
   createdAt?: string;
   updatedAt?: string;
   category?: Category | null;
+  variants?: ProductVariant[];
+  units?: ProductUnit[];
 }
 
 export interface ProductPayload {
@@ -96,6 +105,108 @@ export interface ProductPayload {
   sellingPrice: number;
   minStock?: number;
   isTaxable?: boolean;
+  /** Stok awal (satuan dasar) — hanya dipakai saat create; edit lewat Koreksi Stok */
+  stockOnHand?: number;
+  /** Fase 2: produk jasa = tanpa cek/potong stok */
+  trackStock?: boolean;
+  expiryDate?: string | null;
+  /** Fase 2: varian dibuat sekaligus dengan produk (AC-01.1) */
+  variants?: ProductVariantPayload[];
+  /** Fase 2: satuan tambahan (opsional; UI utama = halaman detail) */
+  units?: ProductUnitPayload[];
+}
+
+// ---------- Product Variants (SPEC §3.2) ----------
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  sku?: string | null;
+  barcode?: string | null;
+  costPrice: number;
+  sellingPrice: number;
+  stockOnHand: number;
+  minStock: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductVariantPayload {
+  name: string;
+  sku?: string;
+  barcode?: string;
+  costPrice?: number;
+  sellingPrice: number;
+  stockOnHand?: number;
+  minStock?: number;
+  isActive?: boolean;
+}
+
+// ---------- Product Units — konversi satuan (SPEC §3.3, R1) ----------
+export interface ProductUnit {
+  id: string;
+  productId: string;
+  unit: string;
+  factor: number;
+  sellPrice: number;
+  isSellable: boolean;
+  isPurchaseUnit: boolean;
+  minQty: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductUnitPayload {
+  unit: string;
+  factor: number;
+  sellPrice: number;
+  isSellable?: boolean;
+  isPurchaseUnit?: boolean;
+  minQty?: number;
+}
+
+// ---------- Detail produk (GET /products/:id, SPEC §4.1) ----------
+export interface ProductDetail {
+  product: Product;
+  stockOnHand: number;
+  variants: ProductVariant[];
+  units: ProductUnit[];
+}
+
+// ---------- Pencarian barcode/SKU (GET /products/barcode/:barcode) ----------
+export interface BarcodeLookupResult {
+  product: Product;
+  variant?: ProductVariant | null;
+  stockOnHand: number;
+  unit: string;
+}
+
+// ---------- Koreksi stok varian (PATCH /product-variants/:id/stock) ----------
+export interface VariantStockResult {
+  variantId: string;
+  before: number;
+  after: number;
+  type: "purchase_in" | "adjustment";
+}
+
+// ---------- Import / Export Excel (SPEC §4.1, US-05/US-06) ----------
+export interface ImportRowResult {
+  rowNumber: number;
+  status: "ok" | "error";
+  message?: string;
+}
+
+export interface ImportResult {
+  inserted: number;
+  updated: number;
+  failed: number;
+  rows: ImportRowResult[];
+}
+
+export interface DeleteResult {
+  id: string;
+  deleted: boolean;
 }
 
 export interface StockAdjustPayload {
@@ -108,6 +219,8 @@ export interface StockAdjustPayload {
 export interface StockMovement {
   id: string;
   productId: string;
+  /** Fase 2 (SPEC §3.5): terisi bila mutasi stok varian */
+  productVariantId?: string | null;
   type: string;
   quantity: number;
   beforeQty: number;
@@ -202,10 +315,14 @@ export interface CartDiscount {
 
 export interface CartItem {
   productId: string;
+  /** Fase 2: terisi saat menjual varian */
+  variantId?: string | null;
   name: string;
   sku?: string | null;
   barcode?: string | null;
   unit: string;
+  /** Snapshot faktor konversi saat item masuk cart (unit dasar = 1) */
+  unitFactor?: number;
   unitPrice: number;
   quantity: number;
   stockOnHand: number;
@@ -217,6 +334,10 @@ export interface CheckoutPayload {
   customerId?: string;
   items: {
     productId: string;
+    /** Fase 2: wajib diisi saat menjual varian */
+    variantId?: string | null;
+    /** Fase 2: satuan penjualan (dus, renceng, …). Kosong = unit dasar */
+    unit?: string;
     quantity: number;
     discount?: CartDiscount;
   }[];
@@ -241,10 +362,13 @@ export interface PreviewResult {
   redeemablePoints: number;
   items: {
     productId: string;
+    variantId?: string | null;
     name: string;
+    unit: string;
     quantity: number;
     unitPrice: number;
     lineTotal: number;
+    /** Stok tersedia dalam satuan yang dipilih (floor) */
     availableStock: number;
   }[];
 }
@@ -253,6 +377,12 @@ export interface TransactionItem {
   id: string;
   transactionId: string;
   productId?: string | null;
+  /** Fase 2 (SPEC §3.4): snapshot varian saat transaksi */
+  variantId?: string | null;
+  /** Snapshot satuan penjualan */
+  unit?: string;
+  /** Snapshot faktor konversi (qty stok = quantity × unitFactor) */
+  unitFactor?: number;
   productName: string;
   productSku: string;
   quantity: number;

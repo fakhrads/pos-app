@@ -3,8 +3,8 @@ export interface Warehouse {
   id: string;
   code: string;
   name: string;
-  address: string;
-  pic: string; // Person in Charge
+  address?: string | null;
+  pic?: string | null; // Person in Charge
   capacity: number; // in units/sqm
   isActive: boolean;
   createdAt: string;
@@ -25,6 +25,8 @@ export interface WarehouseStock {
   id: string;
   warehouseId: string;
   productId: string;
+  /** Fase 2 (SPEC §3.7): NULL = stok produk non-varian; terisi = stok varian */
+  productVariantId?: string | null;
   quantity: number;
   minStock: number;
   updatedAt: string;
@@ -46,6 +48,8 @@ export interface StockTransfer {
   fromWarehouseId: string;
   toWarehouseId: string;
   productId: string;
+  /** Fase 2 (SPEC §3.8): terisi saat transfer stok varian */
+  productVariantId?: string | null;
   quantity: number;
   notes?: string;
   createdAt: string;
@@ -77,6 +81,8 @@ export interface StockAdjustment {
   id: string;
   warehouseId: string;
   productId: string;
+  /** Fase 2 (SPEC §3.8): terisi saat adjustment stok varian */
+  productVariantId?: string | null;
   quantityDelta: number; // positive = tambah, negative = kurang
   reason: string;
   createdAt: string;
@@ -114,6 +120,8 @@ export interface StockMutation {
   id: string;
   warehouseId: string;
   productId: string;
+  /** Fase 2: terisi saat mutasi stok varian */
+  productVariantId?: string | null;
   type: MutationType;
   quantityBefore: number;
   quantityDelta: number;

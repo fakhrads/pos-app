@@ -8,14 +8,17 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "db:migrate": "bun src/db/migrate.ts",
+    "db:seed": "bun src/db/seed.ts",
     "db:push": "drizzle-kit push",
+    "test": "bun test tests/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.2",
     "elysia": "^1.2.25",
     "jose": "^6.0.10",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@elysiajs/swagger": "^1.2.2",

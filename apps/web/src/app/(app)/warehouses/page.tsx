@@ -99,7 +99,7 @@ export default function WarehousesPage() {
     (w) =>
       w.name.toLowerCase().includes(search.toLowerCase()) ||
       w.code.toLowerCase().includes(search.toLowerCase()) ||
-      w.pic.toLowerCase().includes(search.toLowerCase())
+      (w.pic ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
