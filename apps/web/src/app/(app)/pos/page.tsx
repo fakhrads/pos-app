@@ -11,6 +11,21 @@ import {
   uuidv4,
 } from "@/lib/utils";
 import { useSettings, useSetting } from "@/hooks/use-settings";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useAuth } from "@/providers/auth-provider";
+import {
+  idbToProduct,
+  searchProducts,
+  getAllProducts,
+  getProduct,
+  findProductByBarcode,
+} from "@/lib/offline-db";
+import {
+  pullCatalog,
+  registerBackgroundSync,
+  runSync,
+  isCatalogStale,
+} from "@/lib/sync";
 import { ProductGrid, type PosAddOptions } from "@/components/pos/product-grid";
 import { CartSheet, type CartSummary, type ItemKey } from "@/components/pos/cart-sheet";
 import { PaymentDialog } from "@/components/pos/payment-dialog";
@@ -18,6 +33,10 @@ import { HoldList } from "@/components/pos/hold-list";
 import { ShiftManager } from "@/components/pos/shift-manager";
 import { ReceiptActions } from "@/components/pos/receipt-actions";
 import { lineKey } from "@/components/pos/cart-utils";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import type {
   CartDiscount,
   CartItem,
@@ -59,6 +78,23 @@ export default function PosPage() {
   const showVerificationQr = useSetting(settings, "receipt.show_verification_qr", false);
   const showQrisQr = useSetting(settings, "receipt.show_qris_qr", false);
   const storeWhatsapp = useSetting(settings, "store.whatsapp_number", "");
+  const staleAfterDays = useSetting(settings, "offline.stale_after_days", 14);
+
+  // ---------- Offline / PWA ----------
+  const online = useOnlineStatus();
+  const offline = !online;
+  const { user } = useAuth();
+  const operatorName = user?.name ?? "Kasir";
+  const storeAddress = useSetting(settings, "store.address", "");
+  const storePhone = useSetting(settings, "store.phone", "");
+  const receiptFooter = useSetting(settings, "receipt.footer", "");
+  const storeProfile = {
+    name: storeName,
+    address: storeAddress,
+    phone: storePhone,
+    footer: receiptFooter,
+  };
+  const [catalogStale, setCatalogStale] = useState(false);
 
   // ---------- Katalog ----------
   const [categories, setCategories] = useState<Category[]>([]);
@@ -118,14 +154,61 @@ export default function PosPage() {
 
   // ---------- Load kategori & produk ----------
   useEffect(() => {
+    if (offline) {
+      // Offline: kategori disusun dari cache produk di IndexedDB
+      getAllProducts()
+        .then((all) => {
+          const map = new Map<string, string>();
+          all.forEach((p) => {
+            if (p.categoryId && p.categoryName) map.set(p.categoryId, p.categoryName);
+          });
+          const cats: Category[] = Array.from(map.entries()).map(([id, name], i) => ({
+            id,
+            name,
+            slug: name.toLowerCase().replace(/\s+/g, "-"),
+            sortOrder: i,
+            isActive: true,
+          }));
+          setCategories(cats);
+        })
+        .catch(() => {});
+      return;
+    }
     api
       .get<{ items: Category[] }>("/categories")
       .then((d) => setCategories(d.items))
       .catch(() => {});
-  }, []);
+  }, [offline]);
 
   const fetchProducts = useCallback(
     async (reset: boolean) => {
+      if (offline) {
+        // Offline: baca katalog dari IndexedDB (AC-03.1 / AC-03.3)
+        if (reset) {
+          setProductsLoading(true);
+          setProductsError(null);
+        }
+        try {
+          let items = await searchProducts(search);
+          if (categoryId !== "all") {
+            items = items.filter((p) => p.categoryId === categoryId);
+          }
+          const mapped = items.map(idbToProduct);
+          setProducts(mapped);
+          setHasMore(false);
+        } catch (err) {
+          if (reset) {
+            setProductsError(
+              "Data produk tidak tersedia. Sambungkan ke internet untuk memuat katalog."
+            );
+            setProducts([]);
+          }
+        } finally {
+          setProductsLoading(false);
+          setLoadingMore(false);
+        }
+        return;
+      }
       if (reset) {
         setProductsLoading(true);
         setProductsError(null);
@@ -155,7 +238,7 @@ export default function PosPage() {
         setLoadingMore(false);
       }
     },
-    [search, categoryId]
+    [search, categoryId, offline]
   );
 
   useEffect(() => {
@@ -178,6 +261,18 @@ export default function PosPage() {
     loadHoldCount();
   }, [loadHoldCount, holdsRefreshKey]);
 
+  // ---------- Background sync + cache katalog (Fase 7) ----------
+  useEffect(() => {
+    void registerBackgroundSync();
+    void isCatalogStale(staleAfterDays).then(setCatalogStale);
+    if (online) {
+      // Saat online: tarik katalog ke IndexedDB & jalankan antrean tersisa
+      void pullCatalog().catch(() => {});
+      void runSync();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
   // ---------- Scan barcode / SKU ----------
   async function handleBarcode(e: React.FormEvent) {
     e.preventDefault();
@@ -185,6 +280,19 @@ export default function PosPage() {
     if (!code || barcodeBusy) return;
     setBarcodeBusy(true);
     try {
+      if (offline) {
+        // Offline: cari di IndexedDB (AC-03.1)
+        const found =
+          (await findProductByBarcode(code)) ??
+          (await searchProducts(code))[0];
+        if (found) {
+          addToCart({ product: idbToProduct(found) });
+          setBarcodeInput("");
+        } else {
+          toast.error("Barcode/SKU tidak ditemukan di cache offline");
+        }
+        return;
+      }
       const data = await api.get<{ product: Product; stockOnHand: number }>(
         `/products/barcode/${encodeURIComponent(code)}`
       );
@@ -482,8 +590,23 @@ export default function PosPage() {
   return (
     <>
       <div className="flex h-[calc(100dvh-8.5rem)] min-h-0 flex-col gap-3 lg:h-[calc(100vh-11rem)] lg:flex-row">
+        {/* Pengantar Modul Kasir & tombol "?" */}
+        <div className="absolute right-4 top-2 z-30 flex items-center gap-1 md:right-6">
+          <ModuleHelpButton moduleId="pos" />
+        </div>
+        <ModuleIntroBadge moduleId="pos" />
         {/* ===== Kiri: banner shift + katalog ===== */}
         <div className="flex min-h-0 flex-1 flex-col gap-2">
+          {(offline || catalogStale) && (
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-500"
+            >
+              {offline
+                ? "Mode Offline — produk & harga dari cache; transaksi disimpan lalu disinkronkan otomatis saat online."
+                : "Data harga mungkin tidak terbaru (cache katalog lama). Sambungkan ke internet untuk memperbarui."}
+            </div>
+          )}
           <ShiftManager
             enforceCheckout={enforceShift}
             cashTolerance={cashTolerance}
@@ -511,6 +634,7 @@ export default function PosPage() {
             onRetry={() => fetchProducts(true)}
             onAdd={addToCart}
             scanRef={scanRef}
+            offline={offline}
           />
         </div>
 
@@ -563,9 +687,15 @@ export default function PosPage() {
         txDiscount={txDiscount}
         redeemPoints={redeemPoints}
         storeName={storeName}
+        taxRate={taxRate}
         qrisPayload={qrisPayload}
         canCheckout={cart.length > 0 && !submitting && shiftOk}
         checkoutBlockReason={checkoutBlockReason}
+        offline={offline}
+        storeProfile={storeProfile}
+        shiftId={shift?.id ?? null}
+        redeemValuePerPoint={redeemValuePerPoint}
+        operatorName={operatorName}
         onSuccess={handleCheckoutSuccess}
         onServerTotalChanged={(t) => {
           setServerTotal(t);

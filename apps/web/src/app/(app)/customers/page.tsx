@@ -26,6 +26,10 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { PaginationControl } from "@/components/pagination-control";
 import { EmptyState } from "@/components/empty-state";
 import { api, ApiError } from "@/lib/api";
@@ -140,9 +144,13 @@ export default function CustomersPage() {
         title="Pelanggan"
         description="Daftar pelanggan, member, dan saldo poin."
         actions={
-          <Button onClick={openCreate}>
-            <UserPlus className="size-4" /> Tambah Pelanggan
-          </Button>
+          <>
+            <ModuleHelpButton moduleId="customers" />
+            <ModuleIntroBadge moduleId="customers" />
+            <Button onClick={openCreate}>
+              <UserPlus className="size-4" /> Tambah Pelanggan
+            </Button>
+          </>
         }
       />
 

@@ -141,6 +141,20 @@ export const MODULE_INTROS: Record<string, ModuleIntroData> = {
     example: "Temukan transaksi #INV-20260818-047 milik Pak Budi.",
     pitfall: "Batalkan dengan hati-hati — stok akan dikembalikan otomatis.",
   },
+  glossary: {
+    id: "glossary",
+    title: "Glosarium",
+    emoji: "📖",
+    what: "Kamus istilah teknis yang dipakai seluruh aplikasi, dijelaskan dengan bahasa sehari-hari.",
+    why: "Supaya kamu tidak bingung dengan istilah seperti COGS, Stock Opname, atau Piutang.",
+    steps: [
+      "Gunakan kotak pencarian untuk cari istilah apapun.",
+      "Baca arti sehari-hari dan contoh angkanya.",
+      "Ketuk 'Buka modul' untuk langsung ke halaman terkait.",
+    ],
+    example: "Cari 'HPP' → artinya Modal Barang, contoh Rp 2.500/bungkus.",
+    pitfall: "Tiap istilah juga punya ikon '?' kecil di form, jadi tidak perlu buka halaman ini terus-menerus.",
+  },
 };
 
 /** Dapatkan pengantar modul. Kembalikan null jika id tidak dikenal. */

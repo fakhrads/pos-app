@@ -7,7 +7,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { searchGlossary } from "@/data/glossary";
 
 /**
  * Tooltip help — ikon "?" untuk penjelasan inline
@@ -74,6 +76,52 @@ export function TermWithTooltip({
       {technical && (
         <span className="text-xs text-text-muted">({technical})</span>
       )}
+      <TooltipHelp content={tooltip} />
+    </span>
+  );
+}
+
+/**
+ * Cari entri glosarium dan tampilkan tooltip-nya. Fallback bila tidak ditemukan
+ * sesuai kasus tepi SPEC §7.5.
+ */
+export function GlossaryTooltip({
+  term,
+  className,
+}: {
+  term: string;
+  className?: string;
+}) {
+  const match = searchGlossary(term)[0];
+  const content = match
+    ? `${match.term} — ${match.definition} Contoh: ${match.example}`
+    : "Istilah ini belum tersedia.";
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="font-medium">{term}</span>
+      <TooltipHelp content={content} className={className} />
+    </span>
+  );
+}
+
+/**
+ * Label form + ikon "?" — taruh di sebelah label yang pakai istilah teknis.
+ * Memakai Label dari ui/label dan TooltipHelp inline.
+ */
+export function LabelWithTooltip({
+  label,
+  tooltip,
+  htmlFor,
+}: {
+  label: string;
+  tooltip: string;
+  htmlFor?: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Label htmlFor={htmlFor} className="text-sm">
+        {label}
+      </Label>
       <TooltipHelp content={tooltip} />
     </span>
   );

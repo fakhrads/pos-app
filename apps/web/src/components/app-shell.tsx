@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BadgePercent,
+  BookOpenText,
   Boxes,
   ClipboardList,
   FileBarChart2,
@@ -28,6 +29,7 @@ import { useAuth } from "@/providers/auth-provider";
 import type { Role } from "@/lib/types";
 import { OnboardingWizard, useOnboardingPending } from "@/components/onboarding/onboarding-wizard";
 import { PracticeModeBanner } from "@/components/onboarding/practice-mode-banner";
+import { OfflineIndicator } from "@/components/offline-indicator";
 
 interface NavItem {
   href: string;
@@ -46,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/customers", label: "Pelanggan", icon: Users, roles: ["admin", "manager", "kasir"] },
   { href: "/discounts", label: "Diskon", icon: BadgePercent, roles: ["admin", "manager"] },
   { href: "/reports", label: "Laporan", icon: FileBarChart2, roles: ["admin", "manager", "kasir"] },
+  { href: "/glossary", label: "Glosarium", icon: BookOpenText, roles: ["admin", "manager", "kasir"] },
   { href: "/profile", label: "Profil", icon: UserCircle2, roles: ["admin", "manager", "kasir"] },
   { href: "/users", label: "Pengguna", icon: UserCircle2, roles: ["admin"] },
   { href: "/settings", label: "Pengaturan", icon: Settings, roles: ["admin"] },
@@ -177,6 +180,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <main className="min-w-0 flex-1">
+        {/* Badge status offline (selalu di kanan atas, tersedia di semua halaman) */}
+        <div className="pointer-events-none fixed right-3 top-3 z-40 flex items-center gap-2">
+          <div className="pointer-events-auto">
+            <OfflineIndicator />
+          </div>
+        </div>
         {/* Banner Mode Latihan (RC-03) */}
         <PracticeModeBanner />
         <div className="p-4 md:p-6">

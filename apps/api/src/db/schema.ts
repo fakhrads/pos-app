@@ -48,6 +48,8 @@ export const returnStatus = pgEnum('return_status', ['completed', 'cancelled']);
 export const pointMovementType = pgEnum('point_movement_type', ['earned', 'redeemed', 'adjustment']);
 // Fase 4 (SPEC §3.1) — status shift: open = aktif, closed = snapshot tersimpan
 export const shiftStatus = pgEnum('shift_status', ['open', 'closed']);
+// Fase 7 (SPEC §3.2/§4) — asal transaksi: 'online' = checkout langsung, 'offline' = hasil sync Background Sync
+export const transactionSource = pgEnum('transaction_source', ['online', 'offline']);
 
 /** INET PostgreSQL — dipetakan sebagai string (postgres.js mengembalikan teks). */
 const inet = customType<{ data: string; driverData: string }>({
@@ -277,6 +279,9 @@ export const transactions = pgTable(
     pointsRedeemed: bigint('points_redeemed', { mode: 'number' }).notNull().default(0),
     redeemedPointsValue: bigint('redeemed_points_value', { mode: 'number' }).notNull().default(0),
     paymentStatus: paymentStatus('payment_status').notNull().default('paid'),
+    // Fase 7 (SPEC §4.2): asal transaksi — 'offline' bila dibuat via /sync (Background Sync).
+    // Default 'online' — backward-compatible, semua transaksi existing otomatis online.
+    source: transactionSource('source').notNull().default('online'),
     notes: text('notes'),
     soldAt: timestamp('sold_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     ...timestamps,
@@ -287,6 +292,8 @@ export const transactions = pgTable(
     index('idx_transactions_user').on(t.userId),
     index('idx_transactions_status').on(t.status),
     index('idx_transactions_sold_completed').on(t.soldAt).where(sql`${t.status} = 'completed'`),
+    // Fase 7 — awal filter transaksi offline (sync, pending-count)
+    index('idx_transactions_source').on(t.source),
     check('ck_transactions_total', sql`${t.total} = ${t.subtotal} - ${t.discountTotal} + ${t.taxTotal} - ${t.redeemedPointsValue}`),
   ],
 );

@@ -20,6 +20,14 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { api, ApiError } from "@/lib/api";
 import { cn, formatIDR, formatNumber, PAYMENT_METHOD_LABEL, uuidv4 } from "@/lib/utils";
+import {
+  getPracticeMode,
+  addPracticeTransaction,
+} from "@/lib/phase6-storage";
+import { buildPracticeCheckout } from "@/components/pos/practice-checkout";
+import { buildOfflineCheckout } from "@/lib/offline-checkout";
+import { queueOfflineOrder } from "@/lib/offline-db";
+import { emitSyncChange } from "@/lib/sync";
 import type {
   CartDiscount,
   CartItem,
@@ -28,6 +36,7 @@ import type {
   Customer,
   PaymentMethod,
   PreviewResult,
+  StoreProfile,
 } from "@/lib/types";
 
 interface PaymentLeg {
@@ -59,6 +68,18 @@ interface PaymentDialogProps {
   onSuccess: (result: CheckoutResult) => void;
   /** Total server berubah → parent update & dialog reset leg */
   onServerTotalChanged: (serverTotal: number) => void;
+  /** Nama kasir yang bertugas (untuk Mode Latihan local receipt) */
+  operatorName?: string;
+  /** Tarif PPN dalam persen (mis. 11). Dipakai untuk hitung Mode Latihan. */
+  taxRate?: number;
+  /** Saat true → transaksi disimpan ke IndexedDB, bukan POST ke server (offline) */
+  offline?: boolean;
+  /** Profil toko utk struk sementara offline */
+  storeProfile?: Partial<StoreProfile>;
+  /** Shift aktif kasir (dipakai utk transaksi offline bila sesi online terakhir) */
+  shiftId?: string | null;
+  /** Nilai redeem per poin (offline: hitung total konsisten) */
+  redeemValuePerPoint?: number;
 }
 
 const QUICK_CASH = [50000, 100000, 200000];
@@ -81,6 +102,12 @@ export function PaymentDialog({
   checkoutBlockReason,
   onSuccess,
   onServerTotalChanged,
+  operatorName = "Kasir",
+  taxRate = 11,
+  offline = false,
+  storeProfile,
+  shiftId,
+  redeemValuePerPoint = 0,
 }: PaymentDialogProps) {
   const [legs, setLegs] = useState<PaymentLeg[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -162,6 +189,83 @@ export function PaymentDialog({
     };
 
     try {
+      // Mode Latihan — transaksi hanya ke localStorage, tidak ke server (RC-03)
+      if (getPracticeMode()) {
+        // Rekonstruksi ringkasan pembayaran secara lokal (tanpa server preview)
+        const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+        const itemDiscounts = cart.reduce(
+          (s, i) =>
+            s +
+            (i.discount
+              ? i.discount.type === "percentage"
+                ? Math.round((i.unitPrice * i.quantity * i.discount.value) / 100)
+                : Math.min(i.discount.value, i.unitPrice * i.quantity)
+              : 0),
+          0
+        );
+        const txDiscountAmount = txDiscount
+          ? txDiscount.type === "percentage"
+            ? Math.round((subtotal * txDiscount.value) / 100)
+            : Math.min(txDiscount.value, subtotal)
+          : 0;
+        const discountTotal = Math.min(subtotal, itemDiscounts + txDiscountAmount);
+        const dpp = subtotal - discountTotal;
+        const taxTotal = Math.round((dpp * taxRate) / 100);
+        const finalTotal = dpp + taxTotal;
+
+        const practiceResult = buildPracticeCheckout({
+          cart,
+          legs,
+          customer,
+          storeName,
+          total: finalTotal,
+          subtotal,
+          discountTotal,
+          taxTotal,
+          operatorName,
+          manualDiscountName: txDiscount?.reason ?? null,
+          redeemPoints,
+          taxRate,
+        });
+        addPracticeTransaction(practiceResult);
+        toast.success(
+          `Mode Latihan: transaksi ${practiceResult.transaction.invoiceNumber} dicatat local`
+        );
+        onSuccess(practiceResult);
+        return;
+      }
+
+      // 0) Offline → simpan ke IndexedDB, jangan POST ke server (AC-04.1)
+      if (offline) {
+        const { order, result } = buildOfflineCheckout({
+          cart,
+          legs,
+          customer,
+          txDiscount,
+          redeemPoints,
+          taxRate,
+          redeemValuePerPoint,
+          total,
+          storeName,
+          storeProfile,
+          shiftId,
+          operatorName,
+        });
+        try {
+          await queueOfflineOrder(order);
+          emitSyncChange();
+          toast.success(
+            `Offline: transaksi ${result.transaction.invoiceNumber} disimpan — akan disinkronkan otomatis`
+          );
+          onSuccess(result);
+        } catch (err) {
+          setError(
+            err instanceof Error ? err.message : "Gagal menyimpan transaksi offline."
+          );
+        }
+        return;
+      }
+
       // 1) Pra-hitung (server = sumber kebenaran harga & stok)
       const pv = await api.post<PreviewResult>("/transactions/preview", payload);
       if (pv.total !== total) {

@@ -536,6 +536,7 @@ export async function commitCheckout(
   idempotencyKey: string,
   ip: string | null,
   ua: string | null,
+  source: 'online' | 'offline' = 'online',
 ): Promise<{ replay: boolean; transaction: any; items: any[]; payments: any[]; receipt: any; pointsEarned: number }> {
   const reserve = reserveIdempotency(idempotencyKey);
   if (reserve.status === 'processing') fail('REQUEST_IN_PROGRESS', 'Transaksi sedang diproses — tunggu sebentar', 409);
@@ -585,6 +586,7 @@ export async function commitCheckout(
               pointsRedeemed: computed.pointsRedeemed,
               redeemedPointsValue: computed.redeemedPointsValue,
               paymentStatus: 'paid',
+              source,
               notes: input.notes ?? null,
               soldAt: new Date(),
             })

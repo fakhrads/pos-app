@@ -26,6 +26,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
 import { PaginationControl } from "@/components/pagination-control";
 import { EmptyState } from "@/components/empty-state";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { api, ApiError } from "@/lib/api";
 import {
   debounce,
@@ -78,6 +82,12 @@ export default function TransactionsPage() {
       <PageHeader
         title="Transaksi"
         description={isKasir ? "Riwayat transaksi hari ini (kasir)." : "Riwayat seluruh transaksi."}
+        actions={
+          <>
+            <ModuleHelpButton moduleId="transactions" />
+            <ModuleIntroBadge moduleId="transactions" />
+          </>
+        }
       />
 
       <div className="mb-4 grid gap-2 sm:grid-cols-[1fr_160px]">

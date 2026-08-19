@@ -57,6 +57,9 @@ interface ProductGridProps {
   onAdd: (opts: PosAddOptions) => void;
   /** ref input scan — supaya bisa di-fokus ulang dari luar */
   scanRef: React.RefObject<HTMLInputElement | null>;
+  /** Saat offline: pakai variants/units yang sudah tertanam di objek produk (dari IDB),
+   *  jangan fetch /products/:id ke server (SPEC Fase 7 §3.1). */
+  offline?: boolean;
 }
 
 /** Modal pilih varian (AC-01.7) / satuan (AC-01.8) — data dari GET /products/:id */
@@ -237,6 +240,7 @@ export function ProductGrid({
   onRetry,
   onAdd,
   scanRef,
+  offline = false,
 }: ProductGridProps) {
   const [picker, setPicker] = useState<Product | null>(null);
   const [detail, setDetail] = useState<ProductDetail | null>(null);
@@ -266,6 +270,16 @@ export function ProductGrid({
     setDetailError(null);
     setDetailLoading(true);
     try {
+      if (offline) {
+        // Offline: varian & satuan sudah tertanam di objek produk (dari IDB)
+        setDetail({
+          product,
+          stockOnHand: product.stockOnHand,
+          variants: product.variants ?? [],
+          units: product.units ?? [],
+        });
+        return;
+      }
       const d = await api.get<ProductDetail>(`/products/${product.id}`);
       setDetail(d);
     } catch (err) {
@@ -273,7 +287,7 @@ export function ProductGrid({
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [offline]);
 
   function handleCardTap(product: Product) {
     if (product.hasVariants || (product.units && product.units.length > 0)) {

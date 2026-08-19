@@ -46,6 +46,10 @@ import { PageHeader } from "@/components/page-header";
 import { PaginationControl } from "@/components/pagination-control";
 import { EmptyState } from "@/components/empty-state";
 import { ManagerOnly } from "@/components/role-guard";
+import {
+  ModuleHelpButton,
+  ModuleIntroBadge,
+} from "@/components/onboarding/module-intro";
 import { api, ApiError } from "@/lib/api";
 import { debounce, formatIDR, formatNumber } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
@@ -118,11 +122,15 @@ export default function DiscountsPage() {
         title="Diskon & Promo"
         description="Promo terstruktur (kode, periode, kuota). Diskon manual kasir diatur langsung saat checkout."
         actions={
-          isAdmin && (
-            <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
-              <Plus className="size-4" /> Buat Diskon
-            </Button>
-          )
+          <>
+            <ModuleHelpButton moduleId="discounts" />
+            <ModuleIntroBadge moduleId="discounts" />
+            {isAdmin && (
+              <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+                <Plus className="size-4" /> Buat Diskon
+              </Button>
+            )}
+          </>
         }
       />
 

@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/auth-provider";
+import { SerwistProvider } from "@serwist/next/react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,6 +22,25 @@ export const metadata: Metadata = {
     template: "%s | FakhriPOS",
   },
   description: "Aplikasi Point of Sales FakhriPOS — kasir, produk, laporan.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FakhriPOS",
+  },
+  icons: {
+    icon: "/icons/icon-192x192.png",
+    apple: "/icons/icon-192x192.png",
+  },
+};
+
+// Viewport PWA: theme color, full-bleed di layar HP (viewport-fit=cover)
+export const viewport: Viewport = {
+  themeColor: "#7c3aed",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -28,23 +48,6 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <head>
-        {/* Prevent flash of unstyled content for dark mode */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var theme = localStorage.getItem('fakhripos-theme');
-                  if (theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                  }
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
@@ -53,7 +56,14 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="fakhripos-theme"
         >
-          <AuthProvider>{children}</AuthProvider>
+          <SerwistProvider
+            swUrl="/sw.js"
+            reloadOnOnline
+            cacheOnNavigation
+            options={{ scope: "/" }}
+          >
+            <AuthProvider>{children}</AuthProvider>
+          </SerwistProvider>
           <Toaster position="top-right" richColors />
         </ThemeProvider>
       </body>

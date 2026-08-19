@@ -22,6 +22,7 @@ const DDL_PHASE2_PATH = path.join(__dirname, 'ddl-phase2.sql');
 const DDL_PHASE3_PATH = path.join(__dirname, 'ddl-phase3.sql');
 const DDL_PHASE4_PATH = path.join(__dirname, 'ddl-phase4.sql');
 const DDL_PHASE5_PATH = path.join(__dirname, 'ddl-phase5.sql');
+const DDL_PHASE7_PATH = path.join(__dirname, 'ddl-phase7.sql');
 
 async function main(): Promise<void> {
   console.log('[migrate] target:', env.DATABASE_URL.replace(/\/\/.*@/, '//***@'));
@@ -51,6 +52,11 @@ async function main(): Promise<void> {
   // index pendukung laporan stok/dead stock, +5 key settings laporan.
   await client.unsafe(readFileSync(DDL_PHASE5_PATH, 'utf-8'));
   console.log('[migrate] DDL Fase 5 selesai (cash_movements, enum cash_movement_direction, +index, +5 key settings).');
+
+  // Fase 7 (SPEC §4): DDL idempotent — 1 enum, 1 kolom ALTER + 1 index,
+  // +4 key settings offline. Tidak ada tabel baru (ready Phase 4.idempotency reuse).
+  await client.unsafe(readFileSync(DDL_PHASE7_PATH, 'utf-8'));
+  console.log('[migrate] DDL Fase 7 selesai (enum transaction_source, transactions.source, +index, +4 key settings offline).');
 
   // ---------- Seed admin awal ----------
   if (!env.SEED_ADMIN_EMAIL || !env.SEED_ADMIN_PASSWORD) {

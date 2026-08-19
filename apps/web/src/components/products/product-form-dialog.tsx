@@ -31,6 +31,7 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { TooltipHelp, LabelWithTooltip } from "@/components/shared/tooltip-help";
 import type {
   Category,
   Product,
@@ -386,7 +387,11 @@ export function ProductFormDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="pf-sku">Kode Barang (SKU)</Label>
+              <LabelWithTooltip
+                label="Kode Barang (SKU)"
+                tooltip="Kode unik untuk mengidentifikasi satu jenis barang. Contoh: IND-001 untuk Indomie Goreng."
+                htmlFor="pf-sku"
+              />
               <Input
                 id="pf-sku"
                 value={form.sku}
@@ -400,7 +405,11 @@ export function ProductFormDialog({
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pf-barcode">Barcode</Label>
+              <LabelWithTooltip
+                label="Barcode"
+                tooltip="Kode batang yang bisa discan untuk mengenali barang. Contoh: 8992388111017 (Indomie Goreng)."
+                htmlFor="pf-barcode"
+              />
               <Input
                 id="pf-barcode"
                 value={form.barcode}
@@ -417,7 +426,11 @@ export function ProductFormDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="pf-cost">Harga Modal (Rp)</Label>
+              <LabelWithTooltip
+                label="Harga Modal (Rp)"
+                tooltip="Harga yang kamu bayar ke supplier (HPP/COGS). Contoh: Indomie beli Rp 2.500/bungkus."
+                htmlFor="pf-cost"
+              />
               <Input
                 id="pf-cost"
                 type="number"
@@ -440,7 +453,11 @@ export function ProductFormDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="pf-sell">Harga Jual (Rp) *</Label>
+              <LabelWithTooltip
+                label="Harga Jual (Rp) *"
+                tooltip="Harga yang kamu jual ke pelanggan. Harus lebih besar dari harga modal agar untung."
+                htmlFor="pf-sell"
+              />
               <Input
                 id="pf-sell"
                 type="number"
@@ -492,7 +509,11 @@ export function ProductFormDialog({
                 </p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="pf-minstock">Stok Minimum</Label>
+                <LabelWithTooltip
+                label="Stok Minimum"
+                tooltip="Stok terendah yang harus ada. Di bawah angka ini kamu akan diberi peringatan untuk restock. Contoh: Indomie min 30."
+                htmlFor="pf-minstock"
+              />
                 <Input
                   id="pf-minstock"
                   type="number"

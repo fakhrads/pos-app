@@ -130,7 +130,7 @@ export function OnboardingWizard({
     const ok = saveOnboarding({ ...profile, completed: true });
     if (!ok) {
       setError(
-        "Mode Latihan tidak bisa disimpan karena penyimpanan penuh. Kosongkan sebagian data, lalu coba lagi."
+        "Penyimpanan penuh sehingga data onboarding tidak bisa disimpan. Kosongkan sebagian data peramban, lalu coba lagi."
       );
       return;
     }

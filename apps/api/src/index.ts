@@ -28,6 +28,7 @@ import { settingsRoutes } from './routes/settings.routes';
 import { warehousesRoutes } from './routes/warehouses.routes';
 import { stockTransfersRoutes } from './routes/stock-transfers.routes';
 import { stockAdjustmentsRoutes } from './routes/stock-adjustments.routes';
+import { syncRoutes } from './routes/sync.routes';
 
 assertEnv();
 
@@ -120,7 +121,8 @@ const app = new Elysia()
       .use(settingsRoutes)
       .use(warehousesRoutes)
       .use(stockTransfersRoutes)
-      .use(stockAdjustmentsRoutes),
+      .use(stockAdjustmentsRoutes)
+      .use(syncRoutes),
   );
 
 // Swagger UI — dev only (dependency @elysiajs/swagger di devDependencies)
